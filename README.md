@@ -1,4 +1,4 @@
-# Project 3 — AMR Navigation (DecodeLabs)
+# Project 3 — AMR Navigation
 
 Autonomous mobile robot navigation in simulation: LiDAR mapping, EKF state
 estimation, a hand-written A* planner, and reflex-level dynamic obstacle
