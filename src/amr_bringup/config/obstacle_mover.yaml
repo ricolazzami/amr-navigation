@@ -1,0 +1,18 @@
+obstacle_mover:
+  ros__parameters:
+    use_sim_time: true
+    world_name: maze
+    model_name: mover
+    # slides *across* the robot's east corridor (the A* route leaves the start
+    # room at y ~= -4.33 and runs east), so the reflex really has to hold, mark
+    # and replan around it. It must cross the lane, never run along it: a mover
+    # that sweeps parallel to the route at x=1.5 physically collides with the
+    # robot at x=1.68 and can never be passed.
+    # quoted: YAML 1.1 reads a bare `y` as boolean True
+    axis: "y"
+    x: 0.5
+    z: 0.25
+    y_min: -4.6
+    y_max: -2.8
+    period: 8.0
+    rate_hz: 5.0

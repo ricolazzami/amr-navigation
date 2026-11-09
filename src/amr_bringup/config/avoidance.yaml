@@ -1,0 +1,35 @@
+avoidance_node:
+  ros__parameters:
+    use_sim_time: true
+    costmap_topic: /local_costmap/costmap
+    cmd_in_topic: /cmd_vel_nav
+    cmd_out_topic: /cmd_vel
+    blocked_topic: /blocked_cell
+    base_frame: base_link
+    map_frame: map
+
+    max_speed: 0.26
+    safe_distance: 0.30
+    min_distance: 0.15
+    tanh_gain: 3.0
+    scan_radius: 1.2
+    corridor_half_width: 0.18
+    # only lethal costmap cells count as obstacles. Nav2 publishes costs in
+    # 0..100 (lethal 100, inscribed 99, inflation below that), so 100 means
+    # "real obstacle". A lower value picks up the inflation halo and a wall
+    # 0.5 m away would "appear" 0.3 m away; 250 is above the scale and never
+    # triggers at all.
+    obstacle_threshold: 100
+    steer_gain: 0.8
+
+    control_rate: 20.0
+    watchdog_timeout: 0.5
+    # 1 s per spec: hold, then mark the cell and let the planner re-route
+    wait_before_mark: 1.0
+    mark_period: 1.5
+    # recovery manoeuvre when the reflex has pinned the robot for too long
+    recovery_after: 2.5
+    recovery_period: 2.0
+    recovery_reverse: 0.07
+    recovery_reverse_time: 0.7
+    recovery_rotate: 0.9

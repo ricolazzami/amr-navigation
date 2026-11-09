@@ -1,0 +1,44 @@
+# robot_localization EKF — Deliverable 1.
+# Fuses wheel odometry (continuous, drifting) with IMU (noisy) into one smooth
+# odom -> base_footprint transform. slam_toolbox owns map -> odom, never this.
+ekf_filter_node:
+  ros__parameters:
+    use_sim_time: true
+
+    frequency: 30.0
+    sensor_timeout: 0.2
+    two_d_mode: true
+
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom
+
+    # wheel odometry: trust the twist (vx, vyaw), not the integrated pose.
+    # /wheel/odom_fixed is /wheel/odom with gz's scoped frames rewritten.
+    odom0: /wheel/odom_fixed
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_queue_size: 10
+    odom0_differential: false
+    odom0_relative: false
+
+    # IMU: yaw rate only. Fusing linear acceleration in 2-D drifts badly (the
+    # simulated accelerometer includes gravity, and orientation is not fused
+    # because a simulated IMU has no absolute heading reference).
+    imu0: /imu/data
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_queue_size: 20
+    imu0_differential: false
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true
+
+    print_diagnostics: true

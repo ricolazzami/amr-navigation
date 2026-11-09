@@ -1,0 +1,33 @@
+# ROS 2 / colcon
+build/
+install/
+log/
+
+# bags and captures
+*.bag
+*.db3
+*.mcap
+*.yaml.active
+docs/bag/
+docs/capture/
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# editors
+.vscode/
+.idea/
+*.swp
+
+# never commit credentials or local environment
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/

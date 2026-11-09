@@ -1,0 +1,221 @@
+<?xml version="1.0"?>
+<robot name="amr" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ==================================================================
+       Geometry. Numbers are chosen for a light 2-layer board-sized robot:
+       it has to load fast in Gazebo on a 7 GB laptop.
+       ================================================================== -->
+  <xacro:property name="chassis_l" value="0.25"/>
+  <xacro:property name="chassis_w" value="0.20"/>
+  <xacro:property name="chassis_h" value="0.08"/>
+  <xacro:property name="base_z" value="0.05"/>   <!-- base_link above ground -->
+  <xacro:property name="wheel_r" value="0.033"/>
+  <xacro:property name="wheel_w" value="0.015"/>
+  <xacro:property name="track" value="0.16"/>    <!-- wheel separation -->
+  <xacro:property name="caster_r" value="0.015"/>
+  <xacro:property name="chassis_mass" value="1.5"/>
+
+  <material name="teal">
+    <color rgba="0.05 0.65 0.65 1.0"/>
+  </material>
+  <material name="dark">
+    <color rgba="0.15 0.15 0.15 1.0"/>
+  </material>
+
+  <!-- ==================================================================
+       Links
+       ================================================================== -->
+  <link name="base_footprint"/>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${base_z}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="${chassis_l} ${chassis_w} ${chassis_h}"/>
+      </geometry>
+      <material name="teal"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${chassis_l} ${chassis_w} ${chassis_h}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="${chassis_mass}"/>
+      <inertia
+        ixx="${chassis_mass / 12.0 * (chassis_w * chassis_w + chassis_h * chassis_h)}"
+        iyy="${chassis_mass / 12.0 * (chassis_l * chassis_l + chassis_h * chassis_h)}"
+        izz="${chassis_mass / 12.0 * (chassis_l * chassis_l + chassis_w * chassis_w)}"
+        ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- wheels: cylinder axis along Y, joint axis therefore +Z in the joint frame -->
+  <xacro:macro name="wheel" params="side y_sign">
+    <link name="wheel_${side}_link">
+      <visual>
+        <geometry>
+          <cylinder radius="${wheel_r}" length="${wheel_w}"/>
+        </geometry>
+        <material name="dark"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="${wheel_r}" length="${wheel_w}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.05"/>
+        <inertia ixx="0.00002" iyy="0.00002" izz="0.00003" ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+    </link>
+
+    <joint name="wheel_${side}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="wheel_${side}_link"/>
+      <origin xyz="0 ${y_sign * track / 2.0} ${wheel_r - base_z}" rpy="-1.5708 0 0"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel side="left" y_sign="1"/>
+  <xacro:wheel side="right" y_sign="-1"/>
+
+  <link name="caster_link">
+    <visual>
+      <geometry>
+        <sphere radius="${caster_r}"/>
+      </geometry>
+      <material name="dark"/>
+    </visual>
+    <collision>
+      <geometry>
+        <sphere radius="${caster_r}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="0.000001" iyy="0.000001" izz="0.000001" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+  <joint name="caster_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="caster_link"/>
+    <origin xyz="${chassis_l / 2.0 - 0.02} 0 ${caster_r - base_z}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- LiDAR sits on top of the chassis -->
+  <link name="laser_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.035" length="0.04"/>
+      </geometry>
+      <material name="dark"/>
+    </visual>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.00002" iyy="0.00002" izz="0.00002" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_link"/>
+    <origin xyz="0 0 ${chassis_h / 2.0 + 0.02}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="imu_link">
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="0.000001" iyy="0.000001" izz="0.000001" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ==================================================================
+       Gazebo Harmonic systems
+       ================================================================== -->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+      <left_joint>wheel_left_joint</left_joint>
+      <right_joint>wheel_right_joint</right_joint>
+      <wheel_separation>${track}</wheel_separation>
+      <wheel_radius>${wheel_r}</wheel_radius>
+      <topic>cmd_vel</topic>
+      <odom_topic>wheel/odom</odom_topic>
+      <odom_frame>odom</odom_frame>
+      <child_frame>base_footprint</child_frame>
+      <max_linear_acceleration>0.5</max_linear_acceleration>
+      <max_angular_acceleration>1.0</max_angular_acceleration>
+      <min_velocity>-0.26</min_velocity>
+      <max_velocity>0.26</max_velocity>
+      <min_angular_velocity>-1.0</min_angular_velocity>
+      <max_angular_velocity>1.0</max_angular_velocity>
+    </plugin>
+
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>joint_states</topic>
+    </plugin>
+  </gazebo>
+
+  <gazebo reference="laser_link">
+    <sensor name="lidar" type="gpu_lidar">
+      <topic>scan</topic>
+      <gz_frame_id>laser_link</gz_frame_id>
+      <update_rate>10</update_rate>
+      <always_on>1</always_on>
+      <visualize>false</visualize>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.12</min>
+          <max>3.5</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </lidar>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <topic>imu/data</topic>
+      <gz_frame_id>imu_link</gz_frame_id>
+      <update_rate>50</update_rate>
+      <always_on>1</always_on>
+      <imu>
+        <angular_velocity>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>0.002</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>0.002</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>0.002</stddev></noise></z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+
+</robot>

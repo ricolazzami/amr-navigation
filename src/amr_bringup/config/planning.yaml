@@ -1,0 +1,25 @@
+a_star_planner:
+  ros__parameters:
+    use_sim_time: true
+    map_topic: /map
+    goal_topic: /goal_pose
+    plan_topic: /plan
+    blocked_topic: /blocked_cell
+    action_name: follow_path
+    map_frame: map
+    base_frame: base_link
+
+    occupied_threshold: 65
+    unknown_is_blocked: true
+
+    # chassis half-diagonal is 0.16 m; 0.05 m of extra margin => 4 cells @5 cm
+    robot_radius: 0.17
+    clearance_margin: 0.05
+
+    heuristic_weight: 1.0
+    overlay_ttl: 8.0
+    # 2 cells: a tight mark around the obstacle. Wider marks plus the 0.25 m
+    # planner inflation seal the 1 m corridor the robot needs to drive through.
+    mark_radius: 0.10
+    replan_min_period: 0.4
+    snap_radius_cells: 20

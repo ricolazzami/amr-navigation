@@ -1,0 +1,172 @@
+<?xml version="1.0"?>
+<!--
+  10 x 10 m maze. Deliberately sparse: a handful of boxes loads fast, keeps
+  the GPU/CPU budget low and still forces a non-trivial A* route.
+
+  Layout (x right, y up), start (-4,-4), goal (4,4):
+    wall_a  x=-2, y -3.5 .. 2      forces the robot west then north
+    wall_b  y= 2, x -2 .. 2        closes the top of the middle room
+    wall_c  x= 2, y -5 .. 0        leaves a 2 m gap at x=2, y 0..2
+    wall_d  y=-2, x -5 .. -2       blocks the short way out of the start room
+-->
+<sdf version="1.9">
+  <world name="maze">
+
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>-0.4 0.2 -1.0</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>10 10</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>10 10</size></plane></geometry>
+          <material>
+            <ambient>0.35 0.35 0.38 1</ambient>
+            <diffuse>0.35 0.35 0.38 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- helpers -->
+    <model name="wall_a">
+      <static>true</static>
+      <pose>-2 0.25 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.1 8.5 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.1 8.5 1.0</size></box></geometry>
+          <material><ambient>0.1 0.5 0.5 1</ambient><diffuse>0.1 0.5 0.5 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_b">
+      <static>true</static>
+      <pose>0 2 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>4.0 0.1 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>4.0 0.1 1.0</size></box></geometry>
+          <material><ambient>0.1 0.5 0.5 1</ambient><diffuse>0.1 0.5 0.5 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_c">
+      <static>true</static>
+      <pose>2 -2.5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.1 5.0 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.1 5.0 1.0</size></box></geometry>
+          <material><ambient>0.1 0.5 0.5 1</ambient><diffuse>0.1 0.5 0.5 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="wall_d">
+      <static>true</static>
+      <pose>-3.5 -2 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>3.0 0.1 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>3.0 0.1 1.0</size></box></geometry>
+          <material><ambient>0.1 0.5 0.5 1</ambient><diffuse>0.1 0.5 0.5 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- perimeter -->
+    <model name="perimeter_north">
+      <static>true</static><pose>0 5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>10 0.1 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>10 0.1 1.0</size></box></geometry>
+          <material><ambient>0.08 0.3 0.3 1</ambient><diffuse>0.08 0.3 0.3 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="perimeter_south">
+      <static>true</static><pose>0 -5 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>10 0.1 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>10 0.1 1.0</size></box></geometry>
+          <material><ambient>0.08 0.3 0.3 1</ambient><diffuse>0.08 0.3 0.3 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="perimeter_east">
+      <static>true</static><pose>5 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.1 10 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.1 10 1.0</size></box></geometry>
+          <material><ambient>0.08 0.3 0.3 1</ambient><diffuse>0.08 0.3 0.3 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="perimeter_west">
+      <static>true</static><pose>-5 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.1 10 1.0</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.1 10 1.0</size></box></geometry>
+          <material><ambient>0.08 0.3 0.3 1</ambient><diffuse>0.08 0.3 0.3 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- static clutter -->
+    <model name="crate_1">
+      <static>true</static><pose>-3.6 1.6 0.2 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.4 0.4 0.4</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.4 0.4 0.4</size></box></geometry>
+          <material><ambient>0.6 0.45 0.2 1</ambient><diffuse>0.6 0.45 0.2 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="crate_2">
+      <static>true</static><pose>3.4 -3.2 0.2 0 0 0</pose>
+      <link name="link">
+        <collision name="c"><geometry><box><size>0.4 0.4 0.4</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.4 0.4 0.4</size></box></geometry>
+          <material><ambient>0.6 0.45 0.2 1</ambient><diffuse>0.6 0.45 0.2 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!--
+      The dynamic obstacle. It is a normal model; obstacle_mover.py drives it
+      with the /world/maze/set_pose service, so no Gazebo plugin is needed.
+    -->
+    <model name="mover">
+      <static>false</static>
+      <pose>0.6 -3.0 0.25 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>2.0</mass>
+          <inertia>
+            <ixx>0.05</ixx>
+            <iyy>0.05</iyy>
+            <izz>0.05</izz>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyz>0.0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="c"><geometry><box><size>0.3 0.3 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.3 0.3 0.5</size></box></geometry>
+          <material><ambient>0.8 0.2 0.15 1</ambient><diffuse>0.8 0.2 0.15 1</diffuse></material></visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
