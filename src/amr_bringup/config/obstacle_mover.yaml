@@ -12,7 +12,12 @@ obstacle_mover:
     axis: "y"
     x: 0.5
     z: 0.25
-    y_min: -4.6
-    y_max: -2.8
-    period: 8.0
+    # The robot drives the east leg at y ~= -4.33. The box must sweep *past*
+    # that lane (down to -4.8), not stop short of it, or it only clips the
+    # 0.18 m forward corridor for a fraction of a second and the reflex never
+    # has to hold. A slow period keeps it in the corridor long enough for the
+    # controller to arrive and pin.
+    y_min: -4.8
+    y_max: -3.4
+    period: 9.0
     rate_hz: 5.0

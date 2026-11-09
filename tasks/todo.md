@@ -4,27 +4,28 @@ Legend: `[ ]` todo · `[x]` done
 Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di bawahnya.
 
 > Status ringkas (verified on the host + in the container, 2026-11-10):
-> Phase 0-5 done. Phase 6 half done (scenario 5 + metrics harness).
+> Phase 0-6 done (metrics measured). Phase 7: README + report done, video todo.
 >
 > | Item | State | Evidence |
 > |---|---|---|
 > | Robot + world + sensors | done | 4 packages build clean, 46 pytest pass |
-> | EKF `odom->base_link` | done | RMSE vs ground truth 0.016 m |
+> | EKF `odom->base_link` | done | static RMSE 0.016 m; dynamic 0.359 -> 0.196 m |
 > | Map + AMCL | done | static 220x220 map, AMCL initial pose (-4,-4,0) |
 > | A* (Manhattan, 4-way) | done | 200x200 = 32 ms, optimal vs Dijkstra in tests |
 > | Path densify | done | fixes Nav2 window truncation false "goal reached" |
 > | Nav2 controller (FollowPath) | done | robot drives the A* path, 0 controller errors |
-> | Avoidance reflex | done | fires: BLOCKED -> 1 s hold -> mark 15 cells -> replan |
-> | Static run | PASS | goal (4,4), 15.9 m / 16.5 m optimal, min clearance 0.10 m |
-> | Dynamic run | PASS | 2x hold+mark+replan, goal reached |
+> | Avoidance reflex | done | fires: BLOCKED -> 1 s hold -> mark -> replan |
+> | Static run | PASS | goal (4,4), 15.89 m / 16.5 m optimal, min clearance 0.10 m |
+> | Dynamic run | PASS | 1x hold+mark+replan, goal reached, no contact |
 > | Unreachable goal | PASS | "A* found no path" -> empty path + controller cancel, robot stops |
-> | Dead-end run | running | 19.45 m route, needs ~220 s of sim time |
-> | Metrics table | partial | `scripts/log_run.py` + `scripts/eval_metrics.py` |
-> | Report + video | todo | Phase 7 |
+> | Dead-end run | PASS | goal (-1.7,4.6), 18.59 m / 19.45 m optimal |
+> | Metrics table | done | `scripts/log_run.py` + `scripts/eval_metrics.py` |
+> | README + report | done | README Results/Parameters, `docs/report.md` |
+> | Video demo | todo | Phase 7 (T7.3) |
 >
-> Known honest result: raw wheel odom is already near-exact in Gazebo (no slip),
-> so EKF does not lower RMSE (0.016 vs 0.016); it fuses IMU yaw and publishes
-> 30 Hz. Report says so instead of inventing a 30% improvement.
+> Honest results, not invented: raw wheel odom is near-exact on a clean run, so
+> EKF does not lower static RMSE (0.016 vs 0.016); it cuts the dynamic-run slip
+> (0.359 -> 0.196 m). Each scenario is one measured run, not 10/10 repeats.
 
 ## Phase 0 — Environment
 
@@ -180,34 +181,45 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
   - Acceptance: path berubah ≤ 0.5 s setelah timer 1 s habis (total ≤ 1.5 s); tidak ada loop replan
   - Scope: M
 
-- [ ] **T5.4 Uji obstacle dinamis**
+- [~] **T5.4 Uji obstacle dinamis**
   - Acceptance: 10/10 bebas tabrakan; osilasi < 2 zero-crossing per approach
+  - Hasil: 1 run terukur (BLOCKED -> 1 s hold -> mark 25 sel -> replan, goal
+    tercapai, d=0.23 m saat hold > radius robot 0.17 m -> tanpa kontak).
+    10/10 belum dijalankan.
   - Scope: M
 
 ## Phase 6 — Evaluasi
 
-- [ ] **T6.1 Skenario 4 & 5**
+- [x] **T6.1 Skenario 4 & 5**
   - Dead-end dan goal unreachable harus fail gracefully (berhenti + status, bukan crash/loop)
+  - Hasil: dead-end PASS (18.59 m vs 19.45 m optimal); unreachable -> "A* found
+    no path" -> path kosong + cancel FollowPath -> robot berhenti di (1.095,-4.273).
   - Scope: S
 
-- [ ] **T6.2 Tabel metrik lengkap**
+- [x] **T6.2 Tabel metrik lengkap**
   - Success, waktu, panjang jalur vs optimal, node diekspansi, min clearance, max decel, RMSE, CPU/RAM
   - Acceptance: semua angka berasal dari bag, bukan estimasi
+  - Hasil: tabel 3 skenario terukur di README `## Results` + `docs/report.md`;
+    sumber `scripts/log_run.py` + `scripts/eval_metrics.py`. CPU/RAM belum diukur.
   - Scope: M
 
 ## Phase 7 — Delivery
 
-- [ ] **T7.1 README + dokumentasi parameter**
+- [x] **T7.1 README + dokumentasi parameter**
   - Instalasi, cara run, tabel parameter, hasil metrik
+  - Hasil: README `## Results` + `## Parameters`.
   - Scope: M
 
-- [ ] **T7.2 Laporan**
+- [x] **T7.2 Laporan**
   - Arsitektur, TF tree, penjelasan `f=g+h`, tabel RMSE, grafik `v` vs jarak, tabel 5 skenario
+  - Hasil: `docs/report.md` (arsitektur, TF, EKF, A* `f=g+h`, RMSE, 5 skenario,
+    limitasi). Grafik `v` vs jarak: lihat `log/run_*.csv` kolom `obs_d`/`out_v`.
   - Scope: M
 
 - [ ] **T7.3 Video demo 3–5 menit (`wf-recorder`)**
   - Intro world → mapping → A* path → avoidance → grafik kecepatan
   - Scope: M
 
-- [ ] **T7.4 (Opsional) Dockerfile + compose reproducible**
+- [x] **T7.4 (Opsional) Dockerfile + compose reproducible**
+  - Hasil: `docker/Dockerfile` + `docker/compose.yaml`, `scripts/run.sh`.
   - Scope: S

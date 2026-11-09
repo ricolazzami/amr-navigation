@@ -87,6 +87,73 @@ The dynamic obstacle is driven with the `gz service` CLI (`/world/maze/set_pose`
 because Harmonic exposes that only as a gz-transport service and the launch
 bridges topics, not services.
 
+## Results
+
+Every number is measured from a recorded run, not estimated:
+
+```bash
+python3 scripts/log_run.py log/run_static.csv 140         # logs while the robot drives
+PYTHONPATH=src/amr_planning python3 scripts/eval_metrics.py \
+    log/run_static.csv --goal 4 4 --name "Maze, static"
+```
+
+`log_run.py` records ground truth (`/world/<world>/dynamic_pose/info`), raw wheel
+odometry, EKF output, the controller command, the commanded output and the
+reflex distance at 10 Hz, and saves the exact `/map` the planner saw. `eval_metrics.py`
+computes the table below from that CSV.
+
+| Scenario | Success | Time to goal (s) | Path (m) / A* optimal | Ratio | Min clearance (m) | Max decel (m/s²) | RMSE raw / EKF (m) |
+|---|---|---|---|---|---|---|---|
+| Static maze | yes | 127.8 | 15.89 / 16.5 | 0.96 | 0.10 | 0.9 | 0.016 / 0.016 |
+| Dynamic obstacle | yes | 144.4 | 15.79 / 16.5 | 0.96 | 0.10 | 2.4 | 0.359 / 0.196 |
+| Dead-end goal | yes | 118.3 | 18.59 / 19.45 | 0.96 | 0.10 | 1.5 | 0.034 / 0.029 |
+| Unreachable goal | graceful stop | — | no path | — | — | — | — |
+
+Notes, stated plainly:
+
+- **Path ratio 0.96** is *travelled ÷ A* optimal through the inflated grid*: the
+  robot drives 4 % less than the discrete optimum because the densified path
+  smooths the 4-way staircase.
+- **Min clearance 0.10 m** is ground-truth distance to the nearest occupied cell
+  minus the 0.16 m chassis half-diagonal; the innermost sample is the start room
+  doorway.
+- **RMSE (static).** Raw wheel odometry is already near-exact in Gazebo (no
+  slip), so the EKF does **not** lower the error there (0.016 vs 0.016). What it
+  adds is a fused, 30 Hz `odom→base_footprint` that also carries IMU yaw rate.
+- **RMSE (dynamic).** While blocked and re-routing around the moving box the
+  wheels slip and raw odometry drifts ~0.5 m; the EKF cuts that to 0.196 m
+  (down 45 %). That is the honest reason the EKF matters here — it is not a
+  static-run win.
+- **Dynamic scenario** produced one `BLOCKED → 1.0 s hold → mark 25 cells →
+  replan`. The box is teleported (no motor), so it is scripted to *yield* and
+  hold position while the robot is within 0.75 m; the reflex still has to hold
+  and re-route, and nothing physically overlaps (at the hold, surface distance
+  0.23 m > 0.17 m robot radius).
+- **Unreachable goal** (`-3.5, 1.0`, in the sealed west room): A* returns no
+  path, the node publishes an empty `/plan` and cancels the running `FollowPath`,
+  and the robot halts within a second and stays — no crash, no replan loop.
+
+## Parameters
+
+| Node | Key | Value | Why |
+|---|---|---|---|
+| `ekf_filter_node` | `frequency` | 30 Hz | smooth `odom→base_footprint` |
+| | `odom0` / `imu0` | `/wheel/odom_fixed` / `/imu/data` | vx, vyaw from wheels; yaw rate from IMU |
+| | `two_d_mode` | true | planar robot |
+| `a_star_planner` | `occupied_threshold` | 65 | cells ≥ 65 % blocked; `-1` unknown also blocked |
+| | `robot_radius` + `clearance_margin` | 0.17 + 0.05 m | 5-cell inflation @ 5 cm |
+| | `heuristic_weight` | 1.0 | Manhattan, admissible → optimal |
+| | `overlay_ttl` / `mark_radius` | 8 s / 0.10 m | dynamic cells expire; tight mark keeps the 1 m door open |
+| `controller_server` | `FollowPath` | RPP, 0.24 m/s | tracks the A* path |
+| | `xy_goal_tolerance` | 0.15 m | |
+| | `use_collision_detection` | false | safety owned by the reflex node |
+| `local_costmap` | `inflation_radius` | 0.20 m | 1 m doors stay passable for a 0.17 m robot |
+| `avoidance_node` | `max_speed` / `safe_distance` / `min_distance` | 0.26 / 0.30 / 0.15 m | `v = v_max·tanh(k·(d−d_safe))`, hard stop at `d_min` |
+| | `tanh_gain` | 3.0 | smooth deceleration |
+| | `corridor_half_width` | 0.18 m | forward corridor width |
+| | `obstacle_threshold` | 100 | Nav2 costs are 0..100; only lethal cells count |
+| | `wait_before_mark` | 1.0 s | hold, then mark and replan |
+
 ## Tests
 
 Pure Python core, no ROS runtime needed:
@@ -109,13 +176,15 @@ src/amr_bringup/       launch, world, params, maps, RViz, obstacle mover
 src/amr_planning/      A* core + ROS node + tests
 src/amr_control/       corridor geometry + avoidance node + tests
 docker/                Dockerfile + compose
-scripts/               run.sh, make_map.py, dump_map.py, diag_drive.py
+scripts/               run.sh, make_map.py, log_run.py, eval_metrics.py, diag_drive.py
 docs/                  report, metrics, bags
 ```
 
 `scripts/make_map.py` regenerates `maps/maze.{pgm,yaml}` from the world.
-`scripts/dump_map.py` and `scripts/diag_drive.py` are diagnostic tools
-(occupancy dump around the robot; live controller/pose table).
+`scripts/log_run.py` + `scripts/eval_metrics.py` produce the Results table.
+`scripts/dump_map.py`, `scripts/dump_costmap.py` and `scripts/diag_drive.py` are
+diagnostic tools (occupancy dump around the robot; costmap value scale; live
+controller/pose table).
 
 ## Known limitations
 
