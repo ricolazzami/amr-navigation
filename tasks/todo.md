@@ -21,7 +21,7 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 > | Dead-end run | PASS | goal (-1.7,4.6), 18.59 m / 19.45 m optimal |
 > | Metrics table | done | `scripts/log_run.py` + `scripts/eval_metrics.py` |
 > | README + report | done | README Results/Parameters, `docs/report.md` |
-> | Video demo | todo | Phase 7 (T7.3) |
+> | Video demo | done | `docs/video/demo.mp4` (4:50), 2x hold+mark+replan |
 >
 > Honest results, not invented: raw wheel odom is near-exact on a clean run, so
 > EKF does not lower static RMSE (0.016 vs 0.016); it cuts the dynamic-run slip
@@ -216,8 +216,12 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
     limitasi). Grafik `v` vs jarak: lihat `log/run_*.csv` kolom `obs_d`/`out_v`.
   - Scope: M
 
-- [ ] **T7.3 Video demo 3–5 menit (`wf-recorder`)**
-  - Intro world → mapping → A* path → avoidance → grafik kecepatan
+- [x] **T7.3 Video demo 3–5 menit**
+  - Hasil: `docs/video/demo.mp4` (4:50, 1280×720). Direkam dari stack headless
+    (Gazebo + RViz pada display X terisolasi di dalam container), jadi tidak ada
+    desktop yang terekam. Satu misi goal (4,4); box dinamis menyeberang koridor,
+    dua event `BLOCKED -> 1 s hold -> mark -> replan`, selesai `Reached the goal!`.
+    Screenshot: `docs/video/shot-*.png`.
   - Scope: M
 
 - [x] **T7.4 (Opsional) Dockerfile + compose reproducible**
