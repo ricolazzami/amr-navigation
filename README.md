@@ -133,6 +133,20 @@ Notes, stated plainly:
   path, the node publishes an empty `/plan` and cancels the running `FollowPath`,
   and the robot halts within a second and stays — no crash, no replan loop.
 
+## Demo
+
+Recorded from the headless stack (Gazebo + RViz on an isolated X display inside
+the container — no desktop capture). Single mission: goal `(4, 4)` across the
+maze; the moving box crosses the robot's corridor.
+
+- Video, 4:50, 1280×720: [`docs/video/demo.mp4`](docs/video/demo.mp4)
+- Screenshots: [`docs/video/`](docs/video)
+
+![Reflex corridor and A* path](docs/video/shot-4-block.png)
+
+The run logged **two** `BLOCKED → 1.0 s hold → mark → replan` events on the east
+corridor and finished with `Reached the goal!`.
+
 ## Parameters
 
 | Node | Key | Value | Why |
