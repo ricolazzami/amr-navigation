@@ -209,16 +209,21 @@ here, in [`docs/report.md`](docs/report.md) §5.3.
 ## Demo
 
 Recorded from the headless stack (Gazebo + RViz on an isolated X display inside
-the container — no desktop capture). Single mission: goal `(4, 4)` across the
-maze; the moving box crosses the robot's corridor.
+the container — no desktop capture). A title card, two labelled missions (goal
+`(4, 4)` first without then with the moving box) and a results card; the old
+take is kept as `docs/video/demo.old.mp4`.
 
-- Video, 4:50, 1280×720: [`docs/video/demo.mp4`](docs/video/demo.mp4)
+- Video, 4:49, 1280×720: [`docs/video/demo.mp4`](docs/video/demo.mp4)
 - Screenshots: [`docs/video/`](docs/video)
 
-![Reflex corridor and A* path](docs/video/shot-4-block.png)
+![Moving box, local costmap and A* path](docs/video/shot-4-block.png)
 
-The run logged **two** `BLOCKED → 1.0 s hold → mark → replan` events on the east
-corridor and finished with `Reached the goal!`.
+In this take the dynamic mission logs **8 `SLOWING` episodes** and the box yields
+as the robot approaches (`obstacle holds position`, twice), and the run ends with
+`Reached the goal!`. It contains **no** `BLOCKED → 1 s hold → mark → replan`
+event: the scripted box moves out of the way rather than staying put. That path
+is exercised and measured in the repeat runs (`docs/report.md` §5.3, up to 9
+escape plans in one run), not in this recording.
 
 ## Parameters
 

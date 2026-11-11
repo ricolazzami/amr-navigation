@@ -258,3 +258,31 @@ whole stack still fits in half a machine with RAM to spare.
 - The local costmap frame is `odom`, the planner's is `map`; both are handled
   explicitly but must stay connected through the EKF.
 - Gazebo GUI + RViz + the full stack exceed ~7 GB; the demo runs headless.
+
+## 8. Demo video
+
+`docs/video/demo.mp4` — 4:49, 1280×720, 25 fps, no audio. Title card, two
+labelled missions and a results card. Recorded from the headless stack: Gazebo
+and RViz render to an isolated X display (`Xvfb :99`) started *inside* the
+container, and `ffmpeg -f x11grab` on the host grabs that display — the host
+desktop is never in frame.
+
+| Part | Content |
+|---|---|
+| Title (6 s) | stack summary |
+| Mission 1 — static maze | goal `(4, 4)`, map + scan + A* path + local costmap |
+| Mission 2 — moving obstacle | same goal with the box crossing the corridor |
+| Results (8 s) | static 10/10, dynamic 10/10, 0 contact, oscillation criterion |
+
+Recorders: `scripts/record_segment.sh` (fresh container → `Xvfb :99` → launch
+with `rviz:=true` → resize RViz to 1280×720 → capture → send the goal → stop at
+`Reached the goal!`) and `scripts/compose_video.sh` (cards + labels + concat,
+auto-trimming the two segments if the total would exceed 295 s).
+
+What the recorded dynamic take shows, stated exactly: 8 `SLOWING` episodes on
+the reflex and two `obstacle holds position` yields from the box, ending in
+`Reached the goal!`. It has **no** `BLOCKED → 1 s hold → mark → replan` event —
+the scripted box moves aside instead of staying put. That behaviour is evidenced
+by the repeat runs in §5.3 (a hold/mark/replan chain and up to nine escape plans
+in `dynamic_02`), not by this recording. Frames: `docs/video/shot-1-lane.png` …
+`shot-5-drive.png`.

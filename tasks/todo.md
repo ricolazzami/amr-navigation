@@ -21,7 +21,7 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 > | Dead-end run | PASS | goal (-1.7,4.6), 106.7 s, 18.5 m / 19.45 m optimal |
 > | Metrics table | done | `scripts/log_run.py` + `scripts/eval_metrics.py` |
 > | README + report | done | README Results/Parameters, `docs/report.md` |
-> | Video demo | done | `docs/video/demo.mp4` (4:50), 2x hold+mark+replan |
+> | Video demo | done | `docs/video/demo.mp4` (4:49), title + 2 misi + hasil |
 > | Checkpoint A | done | TF 1 publisher/frame, map reload tanpa SLAM, EKF RMSE |
 > | T6.2 CPU/RAM | done | 423-484 % core, 444-447 MiB (`docs/report.md` §6) |
 > | Bag + screenshot | done | `docs/bag/run_static` 8.9 MiB, 5 screenshot |
@@ -242,11 +242,17 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
   - Scope: M
 
 - [x] **T7.3 Video demo 3–5 menit**
-  - Hasil: `docs/video/demo.mp4` (4:50, 1280×720). Direkam dari stack headless
-    (Gazebo + RViz pada display X terisolasi di dalam container), jadi tidak ada
-    desktop yang terekam. Satu misi goal (4,4); box dinamis menyeberang koridor,
-    dua event `BLOCKED -> 1 s hold -> mark -> replan`, selesai `Reached the goal!`.
-    Screenshot: `docs/video/shot-*.png`.
+  - Hasil: `docs/video/demo.mp4` (**4:49**, 1280×720, 15.6 MB). Title card +
+    misi 1 (maze statis) + misi 2 (box dinamis, berlabel) + hasil card.
+    Direkam dari stack headless (Gazebo + RViz pada display X terisolasi `Xvfb
+    :99` di dalam container, `ffmpeg -f x11grab` dari host), jadi tidak ada
+    desktop yang terekam. Take ini: refleks mencatat **8 `SLOWING`** dan box
+    menyingkir (`obstacle holds position` 2x), selesai `Reached the goal!`;
+    **tidak** ada event `BLOCKED -> hold -> mark -> replan` di take ini (box
+    bergerak menyingkir) — jalur itu dibuktikan oleh repeat run
+    (`docs/report.md` §5.3). Take lama disimpan `docs/video/demo.old.mp4`.
+    Screenshot: `docs/video/shot-*.png`. Perekam: `scripts/record_segment.sh`
+    + `scripts/compose_video.sh`.
   - Scope: M
 
 - [x] **T7.4 (Opsional) Dockerfile + compose reproducible**

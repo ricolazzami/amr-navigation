@@ -11,6 +11,9 @@ log/
 docs/bag/
 docs/capture/
 
+# previous demo take, kept locally as a fallback
+docs/video/demo.old.mp4
+
 # python
 __pycache__/
 *.py[cod]
