@@ -1,0 +1,26 @@
+# Checkpoint B — bag recorded during a static run
+# Source: container, 2026-11-11. `ros2 bag record -o docs/bag/run_static
+# --max-bag-duration 40 /scan /odom /odometry/filtered /cmd_vel /plan /map`
+# The bag itself is gitignored (docs/bag/, *.mcap); this is its `ros2 bag info`.
+
+Files:             run_static_0.mcap .. run_static_4.mcap
+Bag size:          8.9 MiB
+Storage id:        mcap
+ROS Distro:        jazzy
+Duration:          161.238 s
+Messages:          9504
+
+Topic                          Type                              Count
+/cmd_vel                       geometry_msgs/msg/Twist            3103
+/map                           nav_msgs/msg/OccupancyGrid            1
+/odometry/filtered             nav_msgs/msg/Odometry              4683
+/plan                          nav_msgs/msg/Path                   156
+/scan                          sensor_msgs/msg/LaserScan          1561
+
+Note: raw wheel odometry is bridged as /wheel/odom (not /odom), so that topic
+was requested but recorded nothing; the EKF output /odometry/filtered is in the
+bag. 156 /plan messages over 161 s = the ~1 Hz re-plan heartbeat plus the
+mark-and-replan events.
+
+Screenshots of the same stack: docs/video/shot-1-lane.png .. shot-5-drive.png
+(from the recorded demo, RViz on the isolated Xvfb display :99).

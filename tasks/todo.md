@@ -22,6 +22,9 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 > | Metrics table | done | `scripts/log_run.py` + `scripts/eval_metrics.py` |
 > | README + report | done | README Results/Parameters, `docs/report.md` |
 > | Video demo | done | `docs/video/demo.mp4` (4:50), 2x hold+mark+replan |
+> | Checkpoint A | done | TF 1 publisher/frame, map reload tanpa SLAM, EKF RMSE |
+> | T6.2 CPU/RAM | done | 423-484 % core, 444-447 MiB (`docs/report.md` §6) |
+> | Bag + screenshot | done | `docs/bag/run_static` 8.9 MiB, 5 screenshot |
 >
 > Honest results, not invented: raw wheel odom is near-exact on a clean run, so
 > EKF does not lower static RMSE (0.028 vs 0.027); it cuts the dynamic-run slip
@@ -107,9 +110,17 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 
 ## Checkpoint A
 
-- [ ] `ros2 run tf2_tools view_frames` → tree utuh tanpa frame dobel
-- [ ] Peta tersimpan dan bisa di-load ulang
-- [ ] EKF terbukti menurunkan RMSE
+- [x] `ros2 run tf2_tools view_frames` → tree utuh tanpa frame dobel
+  - Hasil: 8 frame, satu parent masing-masing, tanpa frame dobel. `map→odom`
+    hanya dari `amcl` (10.2 Hz), `odom→base_footprint` hanya dari EKF (30 Hz).
+    Bukti: `docs/metrics/checkA_tf.txt` (PDF mentah di `docs/capture/`, ignored).
+- [x] Peta tersimpan dan bisa di-load ulang
+  - Hasil: `map_server` sendirian (tanpa Gazebo, tanpa SLAM) load
+    `maps/maze.yaml` → 220×220 @ 0.05 m, origin (-5.5,-5.5), `/map` terbit.
+    Bukti: `docs/metrics/checkA_map_reload.txt`.
+- [x] EKF terbukti menurunkan RMSE
+  - Hasil: dynamic run 0.106 m (raw) → 0.030 m (EKF), −72 %; dead-end 0.030 →
+    0.034 (EKF sedikit lebih buruk, dalam noise). Tabel: `docs/report.md` §2.
 
 ## Phase 3 — A* (Deliverable 2)
 
@@ -162,7 +173,13 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 ## Checkpoint B
 
 - [ ] Maze statis lulus 10/10
-- [ ] Bag + screenshot tersimpan
+  - Status: 1 run terukur lolos (92.8 s, 0.97, min clearance 0.11 m, 0
+    `found no path`). Repeat 10× belum dijalankan.
+- [x] Bag + screenshot tersimpan
+  - Hasil: `docs/bag/run_static` (5 mcap, 8.9 MiB, 161 s, 9504 pesan: `/scan`,
+    `/cmd_vel`, `/odometry/filtered`, `/plan`, `/map`) — di-ignore git sesuai
+    `.gitignore`; `ros2 bag info` disimpan di `docs/metrics/checkA_bag_info.txt`.
+    Screenshot: `docs/video/shot-1-lane.png` … `shot-5-drive.png`.
 
 ## Phase 5 — Dynamic avoidance (Deliverable 3)
 

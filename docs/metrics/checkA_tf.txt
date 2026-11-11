@@ -1,0 +1,20 @@
+# Checkpoint A — TF tree
+# Source: ros2 run tf2_tools view_frames (container, static stack, 2026-11-11)
+# Raw output: docs/capture/frames_2026-11-11_13.31.51.pdf + .gv (gitignored)
+
+frame            parent             rate
+base_footprint   odom               30.0 Hz   (EKF odom0+imu0)
+odom             map                10.2 Hz   (AMCL)
+base_link        base_footprint     static
+wheel_left_link  base_link          20.1 Hz
+wheel_right_link base_link          20.1 Hz
+caster_link      base_link          static
+imu_link         base_link          static
+laser_link       base_link          static
+
+8 frames, one parent each, no duplicate frame.
+
+/tf publishers: robot_state_publisher, ekf_filter_node, amcl
+map->odom      : amcl only   (launch default slam:=false; with slam:=true map->odom
+                             comes from slam_toolbox and AMCL is not started)
+odom->base_footprint: ekf_filter_node only

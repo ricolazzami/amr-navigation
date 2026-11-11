@@ -133,9 +133,10 @@ Notes, stated plainly:
 - **Unreachable goal** (`-3.5, 1.0`, in the sealed west room): A* returns no
   path, the node publishes an empty `/plan` and cancels the running `FollowPath`,
   and the robot halts within a second and stays — no crash, no replan loop.
-- **Unreachable goal** (`-3.5, 1.0`, in the sealed west room): A* returns no
-  path, the node publishes an empty `/plan` and cancels the running `FollowPath`,
-  and the robot halts within a second and stays — no crash, no replan loop.
+- **Resource use.** A static run costs 423–484 % of one core (≈38 % of a
+  12-thread host) and 444–447 MiB of RAM; per-process breakdown in
+  `docs/report.md` §6. A 161 s bag of one run sits in `docs/bag/run_static`
+  (gitignored) with its `ros2 bag info` in `docs/metrics/checkA_bag_info.txt`.
 
 ## Demo
 

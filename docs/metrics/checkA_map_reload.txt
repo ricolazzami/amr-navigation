@@ -1,0 +1,28 @@
+# Checkpoint A — saved map reloads (no SLAM)
+# Source: container, 2026-11-11. map_server started alone, no Gazebo, no SLAM.
+
+$ head -6 install/amr_bringup/share/amr_bringup/maps/maze.yaml
+image: maze.pgm
+resolution: 0.05
+origin: [-5.5, -5.5, 0.0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+
+$ ros2 run nav2_map_server map_server --ros-args -p yaml_filename:=.../maps/maze.yaml
+$ ros2 lifecycle set /map_server configure   -> Transitioning successful
+$ ros2 lifecycle set /map_server activate    -> Transitioning successful
+
+[map_io] Loading image_file: /work/install/amr_bringup/share/amr_bringup/maps/maze.pgm
+[map_io] Read map .../maze.pgm: 220 X 220 map @ 0.05 m/cell
+[map_server] Activating
+
+$ ros2 topic echo /map --once --field info
+resolution: 0.05000000074505806
+width: 220
+height: 220
+origin.position: x -5.5  y -5.5  z 0.0
+
+=> /map is served from the file with no SLAM running: the shipped map is
+   loadable, and the default launch path (slam:=false -> map_server + AMCL)
+   was already using exactly this file.

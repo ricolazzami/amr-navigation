@@ -87,10 +87,16 @@ the wheels and has the last word on `/cmd_vel`.
   0.18 m half-width forward corridor out to 1.2 m.
 - Speed is scaled smoothly: `v = v_max · tanh(k · (d − d_safe))` with
   `v_max = 0.26`, `d_safe = 0.30`, `k = 3.0`, hard stop at `d_min = 0.15`.
-- If the controller still wants to drive forward (`cmd.vx > 0.02`) but the
-  reflex has taken the speed away (`out.vx ≤ 0.05`) for `wait_before_mark = 1.0 s`,
-  the cell is published on `/blocked_cell`; the planner marks it and re-routes
-  (total ≤ 1.5 s, no replan loop).
+- "Blocked" is judged by **actual progress**, not by the commanded speed: while
+  the controller asks for forward (`cmd.vx > 0.02`) the robot's map-frame
+  position is sampled, and if it moves less than `stall_eps = 0.03 m` for
+  `wait_before_mark = 1.0 s` the nearest obstacle cell is published on
+  `/blocked_cell`; the planner marks it and re-routes (total ≤ 1.5 s, no replan
+  loop). Progress-based detection also fires when the controller has gone quiet
+  mid-path, which a pure speed test always missed.
+- Throttling the forward speed never removes the turn: `angular.z` is scaled by
+  `max(scale, min_angular_scale = 0.35)`. A robot that can still rotate can aim
+  at a gap; one that cannot is stuck for good.
 - A watchdog zeroes the wheels if `/cmd_vel_nav` goes silent for 0.5 s; a
   reverse/rotate recovery fires after 2.5 s pinned.
 
@@ -109,7 +115,26 @@ showed `max = 100, values {87, 96, 99, 100}`.
 | Unreachable | (−3.5, 1.0) | "A* found no path" → empty path + controller cancel, robot halts |
 | Long corridor / start-room exit | — | covered by every run's first leg (the 1 m–2 m doors) |
 
-## 6. Known limitations
+## 6. Resource use (T6.2)
+
+Measured in-container during a static run (`docker stats --no-stream amr`, six
+samples over 72 s), host is a 12-thread machine:
+
+| Metric | Measured |
+|---|---|
+| Container CPU | 423–484 % of one core ≈ 38 % of the 12 threads |
+| Container RAM | 444–447 MiB (6.0 % of the 7.17 GiB available to the container) |
+| Heaviest processes | `gz sim -s` 109 %, `a_star_node` 69 %, `avoidance_node` 68 %, `odom_frame_relay` 53 %, `ros_gz` parameter bridge 33 %, `controller_server` 27 % |
+
+Two honest observations: the two Python nodes (`a_star_node`, `avoidance_node`)
+each cost most of a core, and `odom_frame_relay` (a Python shim that rewrites
+gz's model-scoped `amr/odom → amr/base_footprint` odometry into plain
+`odom → base_footprint`, which is the only form robot_localization accepts)
+costs slightly more than the C++ Nav2 controller it feeds. Both
+are the price of the Python-first design, not of the navigation workload: the
+whole stack still fits in half a machine with RAM to spare.
+
+## 7. Known limitations
 
 - Reverse driving is not shielded (the corridor only looks forward).
 - The reflex is a speed governor, not a planner: it slows and steers but cannot
