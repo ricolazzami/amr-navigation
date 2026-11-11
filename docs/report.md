@@ -47,14 +47,16 @@ RMSE vs ground truth (`/world/maze/dynamic_pose/info`):
 
 | Run | Raw wheel odom | EKF |
 |---|---|---|
-| Static maze | 0.016 m | 0.016 m |
-| Dynamic obstacle | 0.359 m | **0.196 m** |
-| Dead-end | 0.034 m | 0.029 m |
+| Static maze | 0.028 m | 0.027 m |
+| Dynamic obstacle | 0.106 m | **0.030 m** |
+| Dead-end | 0.030 m | 0.034 m |
 
 Honest reading: in Gazebo the wheels do not slip, so raw odometry is already
 near-exact on a clean run and the EKF cannot beat it. The EKF earns its place
 when the robot manoeuvres hard around the moving box: wheel slip drifts raw
-odometry by ~0.5 m and the IMU yaw-rate fusion cuts that error by ~45 %.
+odometry and the IMU yaw-rate fusion cuts that error from 0.106 m to 0.030 m
+(down 72 %). On the dead-end run the EKF is marginally worse (0.030 → 0.034 m),
+inside the noise of a short, clean run — reported as measured.
 
 ## 3. Deliverable 2 — A*
 
@@ -101,17 +103,23 @@ showed `max = 100, values {87, 96, 99, 100}`.
 
 | Scenario | Goal (map) | Result |
 |---|---|---|
-| Static maze | (4.0, 4.0) | reached (3.96, 3.82); 15.89 m vs 16.5 m optimal |
-| Dynamic obstacle | (4.0, 4.0) | 1× BLOCKED → 1 s hold → mark → replan, reached |
-| Dead-end | (−1.7, 4.6) | reached; 18.59 m vs 19.45 m optimal |
+| Static maze | (4.0, 4.0) | reached; 15.95 m vs 16.5 m optimal, 92.8 s |
+| Dynamic obstacle | (4.0, 4.0) | 3× BLOCKED → 1 s hold → mark → replan + 1 recovery, reached, 134.2 s |
+| Dead-end | (−1.7, 4.6) | reached; 18.5 m vs 19.45 m optimal, 106.7 s |
 | Unreachable | (−3.5, 1.0) | "A* found no path" → empty path + controller cancel, robot halts |
 | Long corridor / start-room exit | — | covered by every run's first leg (the 1 m–2 m doors) |
 
 ## 6. Known limitations
 
 - Reverse driving is not shielded (the corridor only looks forward).
+- The reflex is a speed governor, not a planner: it slows and steers but cannot
+  reroute. If the robot is stuck inside the inflated halo the planner falls back
+  to the raw occupancy (`A* escape plan through inflation`) so it can leave the
+  pocket; the reflex guards the walls in the meantime.
+- The scripted obstacle is teleported, not driven by a motor, so it is set to
+  yield near the robot to avoid a non-physical overlap. Because it can freeze at
+  a sweep extreme, outside the forward corridor, a given crossing may not block:
+  holds are timing-dependent (three events on the measured run).
 - The local costmap frame is `odom`, the planner's is `map`; both are handled
   explicitly but must stay connected through the EKF.
-- The scripted obstacle is teleported, not driven by a motor, so it is set to
-  yield near the robot to avoid a non-physical overlap.
 - Gazebo GUI + RViz + the full stack exceed ~7 GB; the demo runs headless.

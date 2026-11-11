@@ -48,6 +48,12 @@ class AvoidanceNode(Node):
         self.declare_parameter("corridor_half_width", 0.35)
         self.declare_parameter("obstacle_threshold", 100)
         self.declare_parameter("steer_gain", 0.8)
+        # Steering authority must never go to zero: a robot that can still turn
+        # can aim at a gap; a robot that cannot turn is stuck for good.
+        self.declare_parameter("min_angular_scale", 0.35)
+        # Progress-based stall detection: commanded forward but not moving.
+        self.declare_parameter("stall_eps", 0.03)
+        self.declare_parameter("cmd_ttl", 3.0)
 
         self.declare_parameter("control_rate", 20.0)
         self.declare_parameter("watchdog_timeout", 0.5)
@@ -77,6 +83,9 @@ class AvoidanceNode(Node):
         self._corridor = float(gp("corridor_half_width").value)
         self._obstacle_threshold = int(gp("obstacle_threshold").value)
         self._steer_gain = float(gp("steer_gain").value)
+        self._min_angular_scale = float(gp("min_angular_scale").value)
+        self._stall_eps = float(gp("stall_eps").value)
+        self._cmd_ttl = float(gp("cmd_ttl").value)
 
         self._rate = float(gp("control_rate").value)
         self._watchdog = float(gp("watchdog_timeout").value)
@@ -99,9 +108,10 @@ class AvoidanceNode(Node):
         self._costmap_stamp = -1e9
         self._cmd = Twist()
         self._cmd_stamp = -1e9
-        self._block_since: float | None = None
-        self._pinned_since = -1e9
+        self._stall_ref: tuple[float, float] | None = None
+        self._stall_since = -1e9
         self._last_mark = -1e9
+        self._last_recovery = -1e9
         self._last_state = ""
         self._recovery_until = -1e9
         self._recovery_dir = 1.0
@@ -152,28 +162,26 @@ class AvoidanceNode(Node):
         now = self._now()
         out = Twist()
 
-        has_cmd = (now - self._cmd_stamp) <= self._watchdog
         obstacle = self._nearest_obstacle(now)
-
+        distance: float | None = None
+        ox = oy = 0.0
         if obstacle is not None:
             distance, ox, oy = obstacle
             self._pub_distance.publish(Float32(data=float(distance)))
         else:
-            distance = None
             self._pub_distance.publish(Float32(data=float("inf")))
 
-        if not has_cmd:
-            # Controller silent: never leave the last command latched on the wheels.
-            self._publish(out, 0.0)
-            self._block_since = None
-            self._set_state("WATCHDOG")
-            return
+        # How hard is the controller asking us to drive forward right now (a
+        # still-fresh command)? This drives stall detection even when the
+        # controller has momentarily gone silent.
+        want = self._cmd.linear.x if (now - self._cmd_stamp) <= self._cmd_ttl else 0.0
+
+        # Progress-based stall detection: mark + recovery, whether or not the
+        # controller is currently speaking. A controller that has stopped on a
+        # path it cannot drive is exactly the deadlock we must break.
+        pinned = self._track_stall(now, want, distance, ox, oy)
 
         # ---- recovery: pinned for too long, back off and turn -------------
-        # A diff-drive robot that has driven its nose into a wall the map has not
-        # learned yet cannot recover by stopping alone: stopping freezes the map,
-        # which freezes the planner. Back off and rotate, then let the planner
-        # (which has now been told about the obstacle) try again.
         if now < self._recovery_until:
             elapsed = self._recovery_period - (self._recovery_until - now)
             rec = Twist()
@@ -183,6 +191,13 @@ class AvoidanceNode(Node):
                 rec.angular.z = self._recovery_rotate * self._recovery_dir
             self._publish(rec, 0.0)
             self._set_state("RECOVERY")
+            return
+
+        has_cmd = (now - self._cmd_stamp) <= self._watchdog
+        if not has_cmd:
+            # Controller silent: never leave the last command latched on the wheels.
+            self._publish(out, 0.0)
+            self._set_state("BLOCKED" if pinned else "WATCHDOG")
             return
 
         target = self._v_max
@@ -203,7 +218,9 @@ class AvoidanceNode(Node):
             scale = 1.0
             if abs(cmd.linear.x) > 1e-3:
                 scale = out.linear.x / cmd.linear.x
-            out.angular.z = cmd.angular.z * scale
+            # Keep a floor on steering: throttling the forward speed must never
+            # take the turn away, or the robot cannot aim at a gap.
+            out.angular.z = cmd.angular.z * max(scale, self._min_angular_scale)
 
             # If we are pinned by an obstacle, steer toward the open side so the
             # robot does not just sit there (optional, small authority).
@@ -213,38 +230,67 @@ class AvoidanceNode(Node):
                 )
 
         self._publish(out, (out.linear.x / self._v_max) if self._v_max else 0.0)
-
-        # ---- blocked-cell reporting -------------------------------------
-        # "Blocked" means the controller wants to drive forward but the reflex
-        # has taken the speed away. A pure in-place rotation (linear.x == 0)
-        # is not an obstacle, and must not mark the map.
-        blocking = (
-            cmd.linear.x > 0.02
-            and distance is not None
-            and distance <= self._d_safe
-            and out.linear.x <= 0.05
+        self._set_state(
+            "BLOCKED" if pinned else ("CRUISE" if target >= self._v_max * 0.99 else "SLOWING")
         )
-        if blocking:
-            if self._block_since is None:
-                self._block_since = now
-                self._pinned_since = now
-            elapsed = now - self._block_since
-            if elapsed >= self._wait_before_mark and (now - self._last_mark) >= self._mark_period:
-                self._report_blocked(ox, oy, distance)
-                self._last_mark = now
-            if (now - self._pinned_since) >= self._recovery_after:
-                self._recovery_dir *= -1
-                self._recovery_count += 1
-                self._recovery_until = now + self._recovery_period
-                self._pinned_since = self._recovery_until
-                self.get_logger().warn(
-                    f"pinned {elapsed:.1f} s -> recovery #{self._recovery_count} "
-                    f"({'left' if self._recovery_dir > 0 else 'right'})"
-                )
-            self._set_state("BLOCKED")
-        else:
-            self._block_since = None
-            self._set_state("CRUISE" if target >= self._v_max * 0.99 else "SLOWING")
+
+    def _track_stall(self, now: float, want: float, distance, ox: float, oy: float) -> bool:
+        """Mark the obstacle and schedule recovery when asked forward but stuck.
+
+        Returns ``True`` while the robot is pinned. Unlike a speed test this
+        looks at *actual* motion, so it also fires when the controller has gone
+        quiet mid-path (the WATCHDOG standoff).
+        """
+        if want <= 0.02:
+            self._stall_ref = None
+            self._stall_since = now
+            return False
+
+        xy = self._robot_xy()
+        if xy is None:
+            return False
+        if self._stall_ref is None:
+            self._stall_ref = xy
+            self._stall_since = now
+            return False
+
+        moved = math.hypot(xy[0] - self._stall_ref[0], xy[1] - self._stall_ref[1])
+        if moved > self._stall_eps:
+            self._stall_ref = xy
+            self._stall_since = now
+            return False
+
+        elapsed = now - self._stall_since
+        if elapsed < self._wait_before_mark:
+            return False
+
+        if distance is not None and (now - self._last_mark) >= self._mark_period:
+            self._report_blocked(ox, oy, distance)
+            self._last_mark = now
+
+        if elapsed >= self._recovery_after and (now - self._last_recovery) >= self._recovery_period:
+            self._recovery_dir *= -1
+            self._recovery_count += 1
+            self._recovery_until = now + self._recovery_period
+            self._last_recovery = now
+            self._stall_ref = xy
+            self._stall_since = now
+            self.get_logger().warn(
+                f"pinned {elapsed:.1f} s -> recovery #{self._recovery_count} "
+                f"({'left' if self._recovery_dir > 0 else 'right'})"
+            )
+        return True
+
+    def _robot_xy(self):
+        """Robot position in the map frame, or ``None`` if TF is not ready."""
+        try:
+            tf = self.tf_buffer.lookup_transform(
+                self._map_frame, self._base_frame, rclpy.time.Time()
+            )
+        except Exception:
+            return None
+        t = tf.transform.translation
+        return (t.x, t.y)
 
     def _publish(self, twist: Twist, scale: float) -> None:
         self._pub_cmd.publish(twist)

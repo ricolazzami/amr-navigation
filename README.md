@@ -104,31 +104,35 @@ computes the table below from that CSV.
 
 | Scenario | Success | Time to goal (s) | Path (m) / A* optimal | Ratio | Min clearance (m) | Max decel (m/s²) | RMSE raw / EKF (m) |
 |---|---|---|---|---|---|---|---|
-| Static maze | yes | 127.8 | 15.89 / 16.5 | 0.96 | 0.10 | 0.9 | 0.016 / 0.016 |
-| Dynamic obstacle | yes | 144.4 | 15.79 / 16.5 | 0.96 | 0.10 | 2.4 | 0.359 / 0.196 |
-| Dead-end goal | yes | 118.3 | 18.59 / 19.45 | 0.96 | 0.10 | 1.5 | 0.034 / 0.029 |
+| Static maze | yes | 92.8 | 15.95 / 16.5 | 0.97 | 0.11 | 0.9 | 0.028 / 0.027 |
+| Dynamic obstacle | yes | 134.2 | 16.11 / 16.5 | 0.98 | 0.10 | 2.4 | 0.106 / 0.030 |
+| Dead-end goal | yes | 106.7 | 18.5 / 19.45 | 0.95 | 0.09 | 1.5 | 0.030 / 0.034 |
 | Unreachable goal | graceful stop | — | no path | — | — | — | — |
 
 Notes, stated plainly:
 
-- **Path ratio 0.96** is *travelled ÷ A* optimal through the inflated grid*: the
-  robot drives 4 % less than the discrete optimum because the densified path
-  smooths the 4-way staircase.
-- **Min clearance 0.10 m** is ground-truth distance to the nearest occupied cell
-  minus the 0.16 m chassis half-diagonal; the innermost sample is the start room
-  doorway.
+- **Path ratio 0.95–0.98** is *travelled ÷ A* optimal through the inflated grid*:
+  the robot drives a few percent less than the discrete optimum because the
+  densified path smooths the 4-way staircase.
+- **Min clearance 0.09–0.11 m** is ground-truth distance to the nearest occupied
+  cell minus the 0.16 m chassis half-diagonal; the innermost sample is the start
+  room doorway.
 - **RMSE (static).** Raw wheel odometry is already near-exact in Gazebo (no
-  slip), so the EKF does **not** lower the error there (0.016 vs 0.016). What it
+  slip), so the EKF does **not** lower the error there (0.028 vs 0.027). What it
   adds is a fused, 30 Hz `odom→base_footprint` that also carries IMU yaw rate.
 - **RMSE (dynamic).** While blocked and re-routing around the moving box the
-  wheels slip and raw odometry drifts ~0.5 m; the EKF cuts that to 0.196 m
-  (down 45 %). That is the honest reason the EKF matters here — it is not a
+  wheels slip and raw odometry drifts; the EKF cuts that from 0.106 m to 0.030 m
+  (down 72 %). That is the honest reason the EKF matters here — it is not a
   static-run win.
-- **Dynamic scenario** produced one `BLOCKED → 1.0 s hold → mark 25 cells →
-  replan`. The box is teleported (no motor), so it is scripted to *yield* and
-  hold position while the robot is within 0.75 m; the reflex still has to hold
-  and re-route, and nothing physically overlaps (at the hold, surface distance
-  0.23 m > 0.17 m robot radius).
+- **Dynamic scenario** produced three `BLOCKED → 1.0 s hold → mark → replan`
+  events on the east corridor plus one `pinned 2.5 s → recovery` back-off. The
+  box is teleported (no motor), so it is scripted to *yield* and hold position
+  while the robot is within 0.75 m; the reflex still holds and re-routes, and
+  nothing physically overlaps (surface distance at the hold 0.21 m > 0.17 m
+  robot radius).
+- **Unreachable goal** (`-3.5, 1.0`, in the sealed west room): A* returns no
+  path, the node publishes an empty `/plan` and cancels the running `FollowPath`,
+  and the robot halts within a second and stays — no crash, no replan loop.
 - **Unreachable goal** (`-3.5, 1.0`, in the sealed west room): A* returns no
   path, the node publishes an empty `/plan` and cancels the running `FollowPath`,
   and the robot halts within a second and stays — no crash, no replan loop.
@@ -167,6 +171,8 @@ corridor and finished with `Reached the goal!`.
 | | `corridor_half_width` | 0.18 m | forward corridor width |
 | | `obstacle_threshold` | 100 | Nav2 costs are 0..100; only lethal cells count |
 | | `wait_before_mark` | 1.0 s | hold, then mark and replan |
+| | `min_angular_scale` | 0.35 | throttling speed never removes the turn |
+| | `stall_eps` / `cmd_ttl` | 0.03 m / 3.0 s | progress-based stall → mark + recovery, even when the controller goes quiet |
 
 ## Tests
 
@@ -204,6 +210,15 @@ controller/pose table).
 
 - Reverse driving is not shielded by the avoidance node (the corridor only
   looks forward).
+- The reflex is a speed governor, not a planner: it can only slow and steer,
+  never reroute. If the robot ends up inside the inflated halo (tight doorway +
+  a recovery nudge) A* has no safe plan, so the planner falls back to the raw
+  occupancy (`A* escape plan through inflation`) and the reflex guards the walls
+  until the robot is clear of the pocket again.
+- Dynamic-obstacle holds are timing-dependent: the box yields within 0.75 m of
+  the robot and can freeze at a sweep extreme, outside the 0.18 m forward
+  corridor, so a given crossing may not block. When it does, the reflex holds,
+  marks and replans (three events on the measured run).
 - The local costmap frame is `odom`; the planner works in `map`. Both are
   handled explicitly, but the two must stay connected through the EKF.
 - Gazebo GUI plus RViz plus the whole stack does not fit comfortably in 7 GB;

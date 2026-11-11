@@ -14,18 +14,18 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 > | A* (Manhattan, 4-way) | done | 200x200 = 32 ms, optimal vs Dijkstra in tests |
 > | Path densify | done | fixes Nav2 window truncation false "goal reached" |
 > | Nav2 controller (FollowPath) | done | robot drives the A* path, 0 controller errors |
-> | Avoidance reflex | done | fires: BLOCKED -> 1 s hold -> mark -> replan |
-> | Static run | PASS | goal (4,4), 15.89 m / 16.5 m optimal, min clearance 0.10 m |
-> | Dynamic run | PASS | 1x hold+mark+replan, goal reached, no contact |
+> | Avoidance reflex | done | fires: BLOCKED -> 1 s hold -> mark -> replan; progress stall + recovery |
+> | Static run | PASS | goal (4,4), 92.8 s, 15.95 m / 16.5 m optimal, min clearance 0.11 m |
+> | Dynamic run | PASS | 3x hold+mark+replan + 1 recovery, 134.2 s, goal reached, no contact |
 > | Unreachable goal | PASS | "A* found no path" -> empty path + controller cancel, robot stops |
-> | Dead-end run | PASS | goal (-1.7,4.6), 18.59 m / 19.45 m optimal |
+> | Dead-end run | PASS | goal (-1.7,4.6), 106.7 s, 18.5 m / 19.45 m optimal |
 > | Metrics table | done | `scripts/log_run.py` + `scripts/eval_metrics.py` |
 > | README + report | done | README Results/Parameters, `docs/report.md` |
 > | Video demo | done | `docs/video/demo.mp4` (4:50), 2x hold+mark+replan |
 >
 > Honest results, not invented: raw wheel odom is near-exact on a clean run, so
-> EKF does not lower static RMSE (0.016 vs 0.016); it cuts the dynamic-run slip
-> (0.359 -> 0.196 m). Each scenario is one measured run, not 10/10 repeats.
+> EKF does not lower static RMSE (0.028 vs 0.027); it cuts the dynamic-run slip
+> (0.106 -> 0.030 m). Each scenario is one measured run, not 10/10 repeats.
 
 ## Phase 0 — Environment
 
@@ -183,9 +183,9 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 
 - [~] **T5.4 Uji obstacle dinamis**
   - Acceptance: 10/10 bebas tabrakan; osilasi < 2 zero-crossing per approach
-  - Hasil: 1 run terukur (BLOCKED -> 1 s hold -> mark 25 sel -> replan, goal
-    tercapai, d=0.23 m saat hold > radius robot 0.17 m -> tanpa kontak).
-    10/10 belum dijalankan.
+  - Hasil: run terukur final -> 3x BLOCKED -> 1 s hold -> mark -> replan + 1x
+    `pinned 2.5 s -> recovery`, goal tercapai, surface distance saat hold 0.21 m
+    > radius robot 0.17 m (tanpa kontak). 10/10 belum dijalankan.
   - Scope: M
 
 ## Phase 6 — Evaluasi

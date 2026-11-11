@@ -1,15 +1,15 @@
 {
   "run": "Dead-end",
   "success": true,
-  "time_to_goal_s": 118.3,
-  "travelled_m": 18.59,
+  "time_to_goal_s": 106.7,
+  "travelled_m": 18.5,
   "astar_optimal_m": 19.45,
-  "path_ratio": 0.96,
-  "min_clearance_m": 0.1,
+  "path_ratio": 0.95,
+  "min_clearance_m": 0.09,
   "max_decel_mps2": 1.5,
-  "rmse_raw_m": 0.034,
-  "rmse_ekf_m": 0.029,
-  "samples": 2574,
-  "duration_s": 257.3
+  "rmse_raw_m": 0.03,
+  "rmse_ekf_m": 0.034,
+  "samples": 2700,
+  "duration_s": 269.9
 }
-| Dead-end | yes | 118.3 | 18.59 / 19.45 (0.96) | 0.1 | 1.5 | 0.034 / 0.029 |
+| Dead-end | yes | 106.7 | 18.5 / 19.45 (0.95) | 0.09 | 1.5 | 0.03 / 0.034 |

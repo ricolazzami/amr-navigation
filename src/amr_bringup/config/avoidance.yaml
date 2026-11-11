@@ -21,9 +21,17 @@ avoidance_node:
     # triggers at all.
     obstacle_threshold: 100
     steer_gain: 0.8
+    # Throttling the forward speed must never take the turn away, or the robot
+    # cannot aim at a gap and sits in a deadlock.
+    min_angular_scale: 0.35
 
     control_rate: 20.0
     watchdog_timeout: 0.5
+    # Progress-based stall: commanded forward but not actually moving (also when
+    # the controller has gone quiet mid-path). cmd_ttl keeps the last command
+    # meaningful for stall detection a little longer than the watchdog.
+    stall_eps: 0.03
+    cmd_ttl: 3.0
     # 1 s per spec: hold, then mark the cell and let the planner re-route
     wait_before_mark: 1.0
     mark_period: 1.5

@@ -81,6 +81,7 @@ class AStarPlanner(Node):
         self._grid: np.ndarray | None = None
         self._spec: GridSpec | None = None
         self._base_mask: np.ndarray | None = None
+        self._raw_mask: np.ndarray | None = None
         self._goal: PoseStamped | None = None
         self._overlay: dict[tuple[int, int], float] = {}
         self._last_plan_s = -1e9
@@ -151,6 +152,7 @@ class AStarPlanner(Node):
             math.ceil((self._robot_radius + self._margin) / spec.resolution)
         )
         self._base_mask = inflate(mask, radius_cells)
+        self._raw_mask = mask
 
         if changed:
             self.get_logger().info(
@@ -298,6 +300,25 @@ class AStarPlanner(Node):
                 goal_free = candidate
                 break
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
+        if cells is None and self._raw_mask is not None:
+            # The robot can end up inside the inflated halo (tight doorway plus a
+            # recovery nudge): every neighbour reads "blocked" and no safe plan
+            # exists, so it freezes for good. Plan on the raw occupancy instead —
+            # the reflex still guards the walls — so the robot can leave the pocket.
+            esc = self._raw_mask.copy() | self._overlay_mask()
+            if self._spec.in_bounds(start):
+                esc[start[1], start[0]] = False
+            for candidate in candidates[:8]:
+                cells = astar(esc, start_free, candidate, weight=self._weight)
+                if cells is not None:
+                    goal_free = candidate
+                    break
+            if cells is not None:
+                self.get_logger().warn(
+                    "A* escape plan through inflation (robot boxed in)",
+                    throttle_duration_sec=5.0,
+                )
 
         if cells is None:
             self.get_logger().error(
