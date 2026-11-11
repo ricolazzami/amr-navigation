@@ -3,9 +3,12 @@
 
     python3 scripts/log_run.py /work/log/run_static.csv 180
 
-Columns: t, gt_x, gt_y, gt_yaw, raw_x, raw_y, filt_x, filt_y,
-         cmd_v, out_v, obs_d
+    180 is simulation seconds (the logger runs on /clock), not wall seconds.
 
+Columns: t, gt_x, gt_y, gt_yaw, raw_x, raw_y, filt_x, filt_y,
+         cmd_v, out_v, obs_d, w_cmd, w_out
+
+t      simulation time in seconds, from /clock
 gt_*   ground truth in the Gazebo world frame (/world/maze/dynamic_pose/info)
 raw_*  raw wheel odometry after the frame relay (/wheel/odom_fixed, odom frame)
 filt_* EKF output (/odometry/filtered, odom frame)
@@ -14,6 +17,9 @@ out_v  what actually reached the wheels (/cmd_vel.linear.x)
 obs_d  closest obstacle in the forward corridor (/avoidance/distance)
 
 The first row is the header; pass the same file to scripts/eval_metrics.py.
+
+CSVs recorded before this used wall-clock time in `t`; those runs measure the
+same behaviour but 20-30 % longer on a loaded host. See docs/metrics/README.md.
 """
 
 from __future__ import annotations
@@ -28,6 +34,7 @@ import tf2_ros
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import OccupancyGrid, Odometry
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Float32
 from tf2_msgs.msg import TFMessage
@@ -40,7 +47,13 @@ COLS = [
 
 class RunLog(Node):
     def __init__(self, path: str, period: float):
-        super().__init__("run_log")
+        # Simulation time, so the recorded `t` (and every metric derived from
+        # it) is independent of how fast the host happens to be running the
+        # simulator. Before this, `t` was wall-clock and the same behaviour
+        # could measure 20-30 % apart on a busy host.
+        super().__init__(
+            "run_log", parameter_overrides=[Parameter("use_sim_time", value=True)]
+        )
         self._f = open(path, "w")
         self._f.write(",".join(COLS) + "\n")
         self._gt = None
@@ -159,6 +172,10 @@ def main() -> None:
     dur = float(sys.argv[2]) if len(sys.argv) > 2 else 180.0
     rclpy.init()
     node = RunLog(path, period=0.1)
+    # `dur` is simulation seconds, so wait for /clock before anchoring it:
+    # anchoring at 0 and then receiving /clock at t=40 would end the log early.
+    while rclpy.ok() and node.get_clock().now().nanoseconds == 0:
+        rclpy.spin_once(node, timeout_sec=0.2)
     end = node.get_clock().now().nanoseconds * 1e-9 + dur
     while rclpy.ok() and node.get_clock().now().nanoseconds * 1e-9 < end:
         rclpy.spin_once(node, timeout_sec=0.05)

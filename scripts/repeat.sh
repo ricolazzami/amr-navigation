@@ -37,7 +37,7 @@ for i in $(seq 1 "$N"); do
     "source /opt/ros/jazzy/setup.bash; source /work/install/setup.bash; cd /work; \
      exec ros2 launch amr_bringup demo.launch.py headless:=true rviz:=false dynamic:=$DYN \
      > /work/log/repeat_$tag.log 2>&1"
-  sleep 40
+  sleep 55
 
   $DC exec -T -d amr bash -lc \
     "source /opt/ros/jazzy/setup.bash; source /work/install/setup.bash; cd /work; \
@@ -49,8 +49,9 @@ for i in $(seq 1 "$N"); do
     '{header: {frame_id: map}, pose: {position: {x: $GOAL_X, y: $GOAL_Y}, orientation: {w: 1.0}}}'" \
     >/dev/null 2>&1
 
-  # Wait for the goal, up to 190 s (static ~95 s, dynamic ~140 s).
-  for _ in $(seq 1 38); do
+  # Wait for the goal, up to 300 s wall (the logger counts simulation seconds:
+  # static ~95 sim s, dynamic ~140 sim s, and the sim runs at RTF 0.3-0.65).
+  for _ in $(seq 1 60); do
     sleep 5
     if grep -q "Reached the goal" "$ROOT/log/repeat_$tag.log" 2>/dev/null; then break; fi
   done
