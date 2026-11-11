@@ -34,7 +34,7 @@ from tf2_msgs.msg import TFMessage
 
 COLS = [
     "t", "gt_x", "gt_y", "gt_yaw", "raw_x", "raw_y",
-    "filt_x", "filt_y", "cmd_v", "out_v", "obs_d",
+    "filt_x", "filt_y", "cmd_v", "out_v", "obs_d", "w_cmd", "w_out",
 ]
 
 
@@ -49,6 +49,8 @@ class RunLog(Node):
         self._cmd_v = float("nan")
         self._out_v = float("nan")
         self._obs_d = float("nan")
+        self._cmd_w = float("nan")
+        self._out_w = float("nan")
 
         self._map_saved = False
         self._map_path = path + ".map"
@@ -106,9 +108,11 @@ class RunLog(Node):
 
     def _on_cmd(self, msg: Twist) -> None:
         self._cmd_v = msg.linear.x
+        self._cmd_w = msg.angular.z
 
     def _on_out(self, msg: Twist) -> None:
         self._out_v = msg.linear.x
+        self._out_w = msg.angular.z
 
     def _on_d(self, msg: Float32) -> None:
         self._obs_d = msg.data
@@ -142,7 +146,8 @@ class RunLog(Node):
         self._f.write(
             f"{t:.3f},{self._gt[0]:.4f},{self._gt[1]:.4f},{self._gt[2]:.4f},"
             f"{raw[0]:.4f},{raw[1]:.4f},{filt[0]:.4f},{filt[1]:.4f},"
-            f"{self._cmd_v:.4f},{self._out_v:.4f},{self._obs_d:.4f}\n"
+            f"{self._cmd_v:.4f},{self._out_v:.4f},{self._obs_d:.4f},"
+            f"{self._cmd_w:.4f},{self._out_w:.4f}\n"
         )
 
     def close(self) -> None:

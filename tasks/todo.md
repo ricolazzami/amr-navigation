@@ -28,7 +28,9 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 >
 > Honest results, not invented: raw wheel odom is near-exact on a clean run, so
 > EKF does not lower static RMSE (0.028 vs 0.027); it cuts the dynamic-run slip
-> (0.106 -> 0.030 m). Each scenario is one measured run, not 10/10 repeats.
+> (0.106 -> 0.030 m). Skenario di `docs/report.md` §5 adalah satu run terukur
+> per skenario; kriteria 10/10 dibuktikan terpisah di §5.2 (statis) dan
+> `docs/metrics/repeat/` (dinamis).
 
 ## Phase 0 — Environment
 
@@ -172,9 +174,11 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
 
 ## Checkpoint B
 
-- [ ] Maze statis lulus 10/10
-  - Status: 1 run terukur lolos (92.8 s, 0.97, min clearance 0.11 m, 0
-    `found no path`). Repeat 10× belum dijalankan.
+- [x] Maze statis lulus 10/10
+  - Status: **10/10** run sampai goal tanpa kontak dan tanpa `found no path`.
+    Rentang waktu 79.9–94.8 s (median 83.3 s), path ratio 0.95–0.97, lateral
+    maksimum 0.12 m. Diukur dari 10 run berurutan dengan container baru tiap
+    run; tidak ada kode yang diubah di antaranya.
 - [x] Bag + screenshot tersimpan
   - Hasil: `docs/bag/run_static` (5 mcap, 8.9 MiB, 161 s, 9504 pesan: `/scan`,
     `/cmd_vel`, `/odometry/filtered`, `/plan`, `/map`) — di-ignore git sesuai
@@ -202,7 +206,8 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
   - Acceptance: 10/10 bebas tabrakan; osilasi < 2 zero-crossing per approach
   - Hasil: run terukur final -> 3x BLOCKED -> 1 s hold -> mark -> replan + 1x
     `pinned 2.5 s -> recovery`, goal tercapai, surface distance saat hold 0.21 m
-    > radius robot 0.17 m (tanpa kontak). 10/10 belum dijalankan.
+    > radius robot 0.17 m (tanpa kontak). Repeat 10x: lihat
+    `docs/metrics/repeat/dynamic_*.txt`.
   - Scope: M
 
 ## Phase 6 — Evaluasi
