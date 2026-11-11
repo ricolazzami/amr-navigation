@@ -57,6 +57,26 @@ visual-only swap.
 Raw CSVs for the repeat batches stay in `log/repeat/` (gitignored); the eval
 files here are the evidence.
 
+## `rerun/` — a live re-check, kept separate on purpose
+
+`scripts/repeat.sh static 3` was run again after the Create body swap, for a
+demonstration. It writes to the same `repeat/static_0N.txt` names, so the three
+acceptance files were restored from git and the new output moved here as
+`rerun_static_01...03.txt`.
+
+| Run | Success | t (s) | Path / optimal | Clearance (m) | Decel (m/s2) | RMSE raw / EKF (m) | Lateral (m) |
+|---|---|---|---|---|---|---|---|
+| rerun_static_01 | yes | 95.8 | 15.84 / 16.5 (0.96) | 0.11 | 0.93 | 0.039 / 0.017 | 0.13 |
+| rerun_static_02 | yes | 85.4 | 15.8 / 16.5 (0.96) | 0.12 | 0.80 | 0.036 / 0.017 | 0.12 |
+| rerun_static_03 | yes | 104.1 | 15.89 / 16.5 (0.96) | 0.10 | 0.90 | 0.014 / 0.020 | 0.09 |
+
+All three pass every gate, but two sit above the 10-run range (79.9–94.8 s):
+95.8 s and 104.1 s. These were measured while the host was also playing the
+demo video and extracting frames, which is the obvious candidate but was not
+instrumented, so it is not claimed. The numbers are reported as measured, and
+they are **not** mixed into the acceptance batch — that batch is the 10 runs
+above, unchanged.
+
 ## Demo video segments
 
 The two recorded segments are built by `scripts/record_segment.sh` and glued by
