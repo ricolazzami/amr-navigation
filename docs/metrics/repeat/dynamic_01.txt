@@ -1,0 +1,23 @@
+{
+  "run": "dynamic_01",
+  "success": true,
+  "goal_snapped": [
+    3.98,
+    3.98
+  ],
+  "arrival_error_m": 0.153,
+  "time_to_goal_s": 120.9,
+  "travelled_m": 15.73,
+  "astar_optimal_m": 16.5,
+  "path_ratio": 0.95,
+  "min_clearance_m": 0.09,
+  "max_decel_mps2": 2.4,
+  "rmse_raw_m": 0.018,
+  "rmse_ekf_m": 0.016,
+  "max_lateral_m": 0.19,
+  "approach_episodes": 1,
+  "max_ang_zero_cross": 0,
+  "samples": 1335,
+  "duration_s": 133.4
+}
+| dynamic_01 | yes | 120.9 | 15.73 / 16.5 (0.95) | 0.09 | 2.4 | 0.018 / 0.016 | 0.19 | 1/0 |

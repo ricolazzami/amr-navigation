@@ -202,12 +202,15 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
   - Acceptance: path berubah ≤ 0.5 s setelah timer 1 s habis (total ≤ 1.5 s); tidak ada loop replan
   - Scope: M
 
-- [~] **T5.4 Uji obstacle dinamis**
+- [x] **T5.4 Uji obstacle dinamis**
   - Acceptance: 10/10 bebas tabrakan; osilasi < 2 zero-crossing per approach
-  - Hasil: run terukur final -> 3x BLOCKED -> 1 s hold -> mark -> replan + 1x
-    `pinned 2.5 s -> recovery`, goal tercapai, surface distance saat hold 0.21 m
-    > radius robot 0.17 m (tanpa kontak). Repeat 10x: lihat
-    `docs/metrics/repeat/dynamic_*.txt`.
+  - Hasil: **10/10** sampai goal, **0 kontak** (min clearance 0.07 m), **0 run**
+    dengan >= 2 zero-crossing pada approach mana pun (terburuk: 8 approach,
+    0 crossing). 7/10 run benar-benar bertemu kotak; 3 run kotaknya sudah lewat
+    koridor (tetap run skenario yang sah, tapi bukan bukti avoidance).
+    Waktu 102.0-197.4 s; outlier `dynamic_02` 6x pinned+recovery, 9x escape plan,
+    raw odom slip 5.08 m (EKF 3.97 m, batas filter ini). Bukti:
+    `docs/metrics/repeat/dynamic_*.txt`, ringkasan `docs/report.md` §5.3.
   - Scope: M
 
 ## Phase 6 — Evaluasi

@@ -185,6 +185,27 @@ Zero runs with an obstacle approach is expected here — nothing in the static
 maze comes within the reflex's 0.30 m safe distance; that check belongs to the
 dynamic scenario.
 
+### Repeat runs — dynamic obstacle, 10/10
+
+`scripts/repeat.sh dynamic 10`, same harness, box teleported on its schedule:
+
+- **10/10 reached the goal, 0/10 contact** (minimum clearance 0.07 m).
+- **0/10 runs with ≥ 2 yaw-rate reversals in any approach** — the oscillation
+  criterion, worst case 0 crossings over 8 approaches.
+- **7/10 runs actually met the box** (it had already left the corridor on the
+  other three, so those prove the scenario runs but say nothing about
+  avoidance); the seven are the evidence.
+- Time 102.0–197.4 s. The 197.4 s outlier (`dynamic_02`) met the box eight
+  times, spent 44 s pinned, and used six recovery cycles plus nine escape plans
+  to get through — with clearance still 0.07 m. While pinned the wheels spin, so
+  its raw odometry integrated 4 m of slip (RMSE 5.08 m, EKF 3.97 m): the EKF
+  fuses yaw rate only and cannot fix a position error caused by wheel slip.
+- Decel 2.40 m/s2 on the runs where the box closes fast is the reflex ramp
+  `0.26·tanh(3·(d−0.30))` collapsing, not a discontinuity.
+
+Full per-run table, including the lateral column that is deliberately not gated
+here, in [`docs/report.md`](docs/report.md) §5.3.
+
 ## Demo
 
 Recorded from the headless stack (Gazebo + RViz on an isolated X display inside

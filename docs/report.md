@@ -51,6 +51,11 @@ RMSE vs ground truth (`/world/maze/dynamic_pose/info`):
 | Dynamic obstacle | 0.106 m | **0.030 m** |
 | Dead-end | 0.030 m | 0.034 m |
 
+One repeat run shows the limit of this filter: while pinned against the moving
+box for 44 s the wheels spin, raw odometry integrates 4 m of slip and the EKF
+(which fuses yaw rate only) cannot correct a position error that comes from
+wheel slip — 5.08 m raw, 3.97 m EKF. Measured, not smoothed over.
+
 Honest reading: in Gazebo the wheels do not slip, so raw odometry is already
 near-exact on a clean run and the EKF cannot beat it. The EKF earns its place
 when the robot manoeuvres hard around the moving box: wheel slip drifts raw
@@ -171,6 +176,54 @@ here is the distance to the planned line, which also contains the plan's own
 0.05 m stair-stepping and the robot's 0.11 m corridor offset, so it is compared
 against 0.30 m and labelled as such rather than being claimed as a 1-cell
 tracking error.
+
+### 5.3 Repeat runs — dynamic obstacle, 10/10
+
+Same harness, `scripts/repeat.sh dynamic 10`. The acceptance for this scenario
+(T5.4) is **no contact** and **fewer than two yaw-rate reversals per obstacle
+approach**; "reached the goal" is the same 0.30 m measure as the static runs.
+
+| Run | Success | t (s) | Path / optimal | Clearance (m) | Decel (m/s2) | RMSE raw / EKF (m) | Lateral (m) | Approaches / max crossing | Pinned / recovery |
+|---|---|---|---|---|---|---|---|---|---|
+| dynamic_01 | yes | 120.9 | 15.73 / 16.5 | 0.09 | 2.40 | 0.018 / 0.016 | 0.19 | 1 / 0 | 0 / 0 |
+| dynamic_02 | yes | 197.4 | 16.84 / 16.5 | 0.07 | 2.40 | 5.083 / 3.966 | 0.28 | 8 / 0 | 6 / 6 |
+| dynamic_03 | yes | 110.5 | 15.85 / 16.5 | 0.08 | 2.40 | 0.089 / 0.043 | 0.10 | 1 / 0 | 0 / 0 |
+| dynamic_04 | yes | 102.9 | 15.83 / 16.5 | 0.10 | 0.90 | 0.027 / 0.017 | 0.13 | 0 / — | 0 / 0 |
+| dynamic_05 | yes | 102.0 | 15.77 / 16.5 | 0.12 | 1.40 | 0.047 / 0.041 | 0.13 | 0 / — | 0 / 0 |
+| dynamic_06 | yes | 108.4 | 15.66 / 16.5 | 0.09 | 2.40 | 0.046 / 0.058 | 0.33 | 2 / 0 | 0 / 0 |
+| dynamic_07 | yes | 107.5 | 15.85 / 16.5 | 0.11 | 2.42 | 0.041 / 0.010 | 0.12 | 1 / 0 | 0 / 0 |
+| dynamic_08 | yes | 105.3 | 15.81 / 16.5 | 0.11 | 2.40 | 0.045 / 0.010 | 0.13 | 1 / 0 | 0 / 0 |
+| dynamic_09 | yes | 108.0 | 15.93 / 16.5 | 0.11 | 1.14 | 0.016 / 0.027 | 0.11 | 0 / — | 0 / 0 |
+| dynamic_10 | yes | 108.0 | 15.79 / 16.5 | 0.12 | 2.40 | 0.402 / 0.329 | 0.10 | 1 / 0 | 0 / 0 |
+
+Result: **10/10 reached the goal, 0/10 contact (minimum clearance 0.07 m),
+0/10 runs with a reversal count ≥ 2 in any approach.**
+
+Read the table honestly, because three of its columns need a sentence:
+
+- **Only 7 of 10 runs actually met the box.** The box is teleported on a fixed
+  schedule, so on three runs it had already left the corridor and the reflex
+  never saw anything nearer than 0.30 m (`dynamic_04`, `_05`, `_09`). Those runs
+  are successful runs of the scenario, but they are *not* evidence about
+  avoidance; the seven that did meet the box are. No run reported
+  `A* found no path`.
+- **`dynamic_02` is the outlier and is reported as measured.** It met the box
+  eight times, was pinned by it for 44 s in total (longest single hold 6.8 s),
+  and burned six `pinned 2.5 s → recovery` cycles and nine escape plans before
+  getting through in 197 s. While pinned the wheels spin, so raw odometry
+  integrated 4 m of slip in x and its RMSE against ground truth is 5.08 m
+  (EKF 3.97 m). The EKF fuses yaw rate only, so it cannot correct a
+  position error caused by wheel slip — that is exactly the limit of this
+  filter, and it is visible in the data. Clearance stayed at 0.07 m: no contact.
+- **`dynamic_06` shows 0.33 m lateral.** The lateral figure is the distance to
+  the *static* A* polyline, and a dynamic run leaves that line on purpose to go
+  round the box, so it is reported but not gated (the static runs, where no
+  replan happens, are gated at 0.30 m). Its clearance is 0.09 m and its
+  crossing count is 0.
+- **Decel 2.40 m/s2** on seven runs is the reflex ramp collapsing when the box
+  closes the gap quickly — the same effect described in §5.1, not a
+  discontinuity. The two runs where the box stayed far away keep the normal
+  0.90–1.4 m/s2 braking profile.
 
 ## 6. Resource use (T6.2)
 
