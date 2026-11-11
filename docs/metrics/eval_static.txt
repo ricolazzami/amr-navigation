@@ -1,15 +1,23 @@
 {
   "run": "Static maze",
   "success": true,
-  "time_to_goal_s": 92.8,
+  "goal_snapped": [
+    3.98,
+    3.98
+  ],
+  "arrival_error_m": 0.148,
+  "time_to_goal_s": 91.2,
   "travelled_m": 15.95,
   "astar_optimal_m": 16.5,
   "path_ratio": 0.97,
   "min_clearance_m": 0.11,
-  "max_decel_mps2": 0.91,
+  "max_decel_mps2": 0.9,
   "rmse_raw_m": 0.028,
   "rmse_ekf_m": 0.027,
+  "max_lateral_m": 0.11,
+  "approach_episodes": 0,
+  "max_ang_zero_cross": null,
   "samples": 1400,
   "duration_s": 139.9
 }
-| Static maze | yes | 92.8 | 15.95 / 16.5 (0.97) | 0.11 | 0.91 | 0.028 / 0.027 |
+| Static maze | yes | 91.2 | 15.95 / 16.5 (0.97) | 0.11 | 0.9 | 0.028 / 0.027 | 0.11 | 0/None |

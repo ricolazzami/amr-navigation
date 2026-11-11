@@ -282,7 +282,7 @@ docker/                Dockerfile + compose
 scripts/               run.sh, make_map.py, log_run.py, eval_metrics.py,
                        repeat.sh, summarize_repeat.py, diag_drive.py,
                        record_segment.sh, compose_video.sh
-docs/                  report, metrics, bags
+docs/                  report, metrics (+ metrics/README.md evidence index), bags
 ```
 
 `scripts/make_map.py` regenerates `maps/maze.{pgm,yaml}` from the world.
@@ -290,6 +290,9 @@ docs/                  report, metrics, bags
 (`python3 scripts/eval_metrics.py --self-test` checks the derived metrics).
 `scripts/repeat.sh static 10` runs a scenario ten times and
 `scripts/summarize_repeat.py docs/metrics/repeat/static_*` prints the pass counts.
+Every number in this README is the output of `scripts/eval_metrics.py` on a
+recorded run; [`docs/metrics/README.md`](docs/metrics/README.md) indexes the
+evidence files and their definitions.
 `scripts/dump_map.py`, `scripts/dump_costmap.py` and `scripts/diag_drive.py` are
 diagnostic tools (occupancy dump around the robot; costmap value scale; live
 controller/pose table).

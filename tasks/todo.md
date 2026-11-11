@@ -3,22 +3,24 @@
 Legend: `[ ]` todo · `[x]` done
 Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di bawahnya.
 
-> Status ringkas (verified on the host + in the container, 2026-11-10):
-> Phase 0-6 done (metrics measured). Phase 7: README + report done, video todo.
+> Status ringkas (verified on the host + in the container, 2026-11-12):
+> Phase 0-7 done. Semua angka di bawah diukur ulang dengan definisi metrik
+> `docs/report.md` §5.1 (arrival ke goal hasil snap, radius 0.30 m, decel
+> median-filtered).
 >
 > | Item | State | Evidence |
 > |---|---|---|
 > | Robot + world + sensors | done | 4 packages build clean, 46 pytest pass |
-> | EKF `odom->base_link` | done | static RMSE 0.016 m; dynamic 0.359 -> 0.196 m |
+> | EKF `odom->base_link` | done | static 0.028 / 0.027 m; dynamic 0.106 -> 0.030 m |
 > | Map + AMCL | done | static 220x220 map, AMCL initial pose (-4,-4,0) |
 > | A* (Manhattan, 4-way) | done | 200x200 = 32 ms, optimal vs Dijkstra in tests |
 > | Path densify | done | fixes Nav2 window truncation false "goal reached" |
 > | Nav2 controller (FollowPath) | done | robot drives the A* path, 0 controller errors |
 > | Avoidance reflex | done | fires: BLOCKED -> 1 s hold -> mark -> replan; progress stall + recovery |
-> | Static run | PASS | goal (4,4), 92.8 s, 15.95 m / 16.5 m optimal, min clearance 0.11 m |
-> | Dynamic run | PASS | 3x hold+mark+replan + 1 recovery, 134.2 s, goal reached, no contact |
+> | Static run | PASS | goal (4,4), 91.2 s, 15.95 m / 16.5 m optimal, clearance 0.11 m |
+> | Dynamic run | PASS | 3x hold+mark+replan + 1 recovery, 132.0 s, no contact |
 > | Unreachable goal | PASS | "A* found no path" -> empty path + controller cancel, robot stops |
-> | Dead-end run | PASS | goal (-1.7,4.6), 106.7 s, 18.5 m / 19.45 m optimal |
+> | Dead-end run | PASS | goal (-1.7,4.6), 105.3 s, 18.5 m / 19.45 m optimal |
 > | Metrics table | done | `scripts/log_run.py` + `scripts/eval_metrics.py` |
 > | README + report | done | README Results/Parameters, `docs/report.md` |
 > | Video demo | done | `docs/video/demo.mp4` (4:55), title + 2 misi + hasil |
@@ -61,10 +63,12 @@ Aturan: satu task = satu sesi fokus, harus bisa diverifikasi dengan perintah di 
   - Acceptance: `git status` bersih setelah `colcon build`
   - Scope: XS
 
-- [ ] **(Opsional, hanya bila FPS RViz < 10) T0.6 Akselerasi iGPU AMD**
-  - Tambah `--device /dev/dri --group-add video --group-add $(getent group render | cut -d: -f3)`, hapus `LIBGL_ALWAYS_SOFTWARE`
-  - Acceptance: `glxinfo | grep "OpenGL renderer"` menampilkan `AMD RENOIR`
-  - **Jangan** pasang `nvidia-container-toolkit`. Ditunda sampai benar-benar perlu.
+- [x] **(Opsional, hanya bila FPS RViz < 10) T0.6 Akselerasi iGPU AMD — tidak perlu**
+  - Hasil: syaratnya tidak terpenuhi. RViz melaporkan **30–31 fps** di pojok kanan
+    bawah pada kedua take demo (`docs/video/demo.mp4`, Xvfb 1280×720, llvmpipe),
+    dan run penuh berjalan tanpa frame drop yang terlihat. Jadi opsi ini ditutup,
+    bukan dikerjakan: `--device /dev/dri` + `LIBGL_ALWAYS_SOFTWARE` tetap tidak
+    diubah. Kalau nanti butuh > 30 fps (mis. 1080p60), buka lagi.
   - Scope: S
 
 ## Phase 1 — Simulasi & robot
