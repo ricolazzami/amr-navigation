@@ -34,11 +34,21 @@
   </joint>
 
   <link name="base_link">
+    <!-- Visual only: skin the chassis with an iRobot Create body. Collision,
+         inertia and the DiffDrive plugin below are untouched, so every
+         measured result (arrival, clearance, RMSE, decel) still describes the
+         same physical robot. The .dae is in inches (13 in = 0.330 m), hence
+         scale 0.0254; centred on the link it spans z = 0.019 .. 0.081 m, i.e.
+         entirely under the 0.11 m LiDAR scan plane, so the wider disc (radius
+         0.165 m > the 0.12 m axis rule) cannot return a false echo. The wheel
+         cylinders (y = +/-0.08, r = 0.033) sit inside the disc and show only
+         where they leave it at the bottom. CC-BY 3.0, see meshes/ATTRIBUTION.md.
+    -->
     <visual>
       <geometry>
-        <box size="${chassis_l} ${chassis_w} ${chassis_h}"/>
+        <mesh filename="file://$(find amr_description)/meshes/create_body.dae"
+              scale="0.0254 0.0254 0.0254"/>
       </geometry>
-      <material name="teal"/>
     </visual>
     <collision>
       <geometry>

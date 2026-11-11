@@ -31,6 +31,15 @@ LiDAR ──► local_costmap ──► avoidance_node (tanh) ──────
 
 TF: `map → odom → base_footprint → base_link → {laser_link, imu_link, wheel_*}`
 
+The chassis is skinned with an iRobot Create body mesh (CC-BY 3.0, OSRF Gazebo
+model database; attribution in
+[`src/amr_description/meshes/ATTRIBUTION.md`](src/amr_description/meshes/ATTRIBUTION.md)).
+It is a **visual shell only** — `<collision>`, `<inertial>` and the DiffDrive
+parameters are the project's own numbers, so every measured result still
+describes the same physical robot; one static run after the swap
+(`docs/metrics/repeat/verify_01.txt`) reproduced the baseline. See
+[`docs/report.md`](docs/report.md) §1.
+
 Design notes:
 
 - **Localisation uses a pre-built map + AMCL by default.** Online SLAM over the
@@ -210,17 +219,17 @@ here, in [`docs/report.md`](docs/report.md) §5.3.
 
 Recorded from the headless stack (Gazebo + RViz on an isolated X display inside
 the container — no desktop capture). A title card, two labelled missions (goal
-`(4, 4)` first without then with the moving box) and a results card; the old
-take is kept as `docs/video/demo.old.mp4`.
+`(4, 4)` first without then with the moving box) and a results card; the previous
+take is kept locally as `docs/video/demo.old.mp4`.
 
-- Video, 4:49, 1280×720: [`docs/video/demo.mp4`](docs/video/demo.mp4)
+- Video, 4:55, 1280×720: [`docs/video/demo.mp4`](docs/video/demo.mp4)
 - Screenshots: [`docs/video/`](docs/video)
 
 ![Moving box, local costmap and A* path](docs/video/shot-4-block.png)
 
-In this take the dynamic mission logs **8 `SLOWING` episodes** and the box yields
-as the robot approaches (`obstacle holds position`, twice), and the run ends with
-`Reached the goal!`. It contains **no** `BLOCKED → 1 s hold → mark → replan`
+In this take the dynamic mission logs **11 `SLOWING` episodes** and the box
+yields once as the robot approaches (`obstacle holds position`), and the run ends
+with `Reached the goal!`. It contains **no** `BLOCKED → 1 s hold → mark → replan`
 event: the scripted box moves out of the way rather than staying put. That path
 is exercised and measured in the repeat runs (`docs/report.md` §5.3, up to 9
 escape plans in one run), not in this recording.
@@ -265,13 +274,14 @@ collision-free paths, inflation, nearest-free snapping, path densification
 ## Layout
 
 ```
-src/amr_description/   URDF/xacro, LiDAR + IMU sensors
+src/amr_description/   URDF/xacro, Create body mesh (+ attribution), LiDAR + IMU
 src/amr_bringup/       launch, world, params, maps, RViz, obstacle mover
 src/amr_planning/      A* core + ROS node + tests
 src/amr_control/       corridor geometry + avoidance node + tests
 docker/                Dockerfile + compose
 scripts/               run.sh, make_map.py, log_run.py, eval_metrics.py,
-                       repeat.sh, summarize_repeat.py, diag_drive.py
+                       repeat.sh, summarize_repeat.py, diag_drive.py,
+                       record_segment.sh, compose_video.sh
 docs/                  report, metrics, bags
 ```
 

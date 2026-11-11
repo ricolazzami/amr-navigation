@@ -1,0 +1,23 @@
+{
+  "run": "verify_01",
+  "success": true,
+  "goal_snapped": [
+    3.98,
+    3.98
+  ],
+  "arrival_error_m": 0.196,
+  "time_to_goal_s": 90.7,
+  "travelled_m": 15.82,
+  "astar_optimal_m": 16.5,
+  "path_ratio": 0.96,
+  "min_clearance_m": 0.11,
+  "max_decel_mps2": 1.53,
+  "rmse_raw_m": 0.016,
+  "rmse_ekf_m": 0.011,
+  "max_lateral_m": 0.1,
+  "approach_episodes": 0,
+  "max_ang_zero_cross": null,
+  "samples": 1030,
+  "duration_s": 102.9
+}
+| verify_01 | yes | 90.7 | 15.82 / 16.5 (0.96) | 0.11 | 1.53 | 0.016 / 0.011 | 0.1 | 0/None |

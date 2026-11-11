@@ -31,6 +31,18 @@ map → odom → base_footprint → base_link → {laser_link, imu_link, wheel_l
 `map→odom` comes from AMCL (or `slam_toolbox` with `slam:=true`), `odom→base_footprint`
 from the EKF — never both owners at once.
 
+**Robot body.** The chassis is skinned with an iRobot Create body mesh
+(`amr_description/meshes/create_body.dae`, CC-BY 3.0, attribution in
+`meshes/ATTRIBUTION.md`). It is a **visual shell only**: `<collision>`
+(0.25 × 0.20 × 0.08 box), `<inertial>` (1.5 kg) and the DiffDrive parameters
+(`wheel_separation` 0.16 m, `wheel_radius` 0.033 m) are unchanged, so every
+number in this report still describes the same physical robot. The mesh is in
+inches, hence the `0.0254` scale; centred on `base_link` it spans
+z = 0.019–0.081 m, entirely below the 0.11 m scan plane. One static run after the
+swap (`docs/metrics/repeat/verify_01.txt`) reproduced the baseline: 90.7 s, path
+ratio 0.96, clearance 0.11 m, lateral 0.10 m, RMSE 0.016/0.011 m — all inside
+the 10-run static range.
+
 ## 2. Deliverable 1 — EKF
 
 `robot_localization` (`config/ekf.yaml`), `two_d_mode`, 30 Hz, world frame `odom`.
@@ -261,7 +273,7 @@ whole stack still fits in half a machine with RAM to spare.
 
 ## 8. Demo video
 
-`docs/video/demo.mp4` — 4:49, 1280×720, 25 fps, no audio. Title card, two
+`docs/video/demo.mp4` — 4:55, 1280×720, 25 fps, no audio. Title card, two
 labelled missions and a results card. Recorded from the headless stack: Gazebo
 and RViz render to an isolated X display (`Xvfb :99`) started *inside* the
 container, and `ffmpeg -f x11grab` on the host grabs that display — the host
@@ -270,7 +282,7 @@ desktop is never in frame.
 | Part | Content |
 |---|---|
 | Title (6 s) | stack summary |
-| Mission 1 — static maze | goal `(4, 4)`, map + scan + A* path + local costmap |
+| Mission 1 — static maze | goal `(4, 4)`, map + scan + A* path + local costmap, Create body visible |
 | Mission 2 — moving obstacle | same goal with the box crossing the corridor |
 | Results (8 s) | static 10/10, dynamic 10/10, 0 contact, oscillation criterion |
 
@@ -279,8 +291,8 @@ with `rviz:=true` → resize RViz to 1280×720 → capture → send the goal →
 `Reached the goal!`) and `scripts/compose_video.sh` (cards + labels + concat,
 auto-trimming the two segments if the total would exceed 295 s).
 
-What the recorded dynamic take shows, stated exactly: 8 `SLOWING` episodes on
-the reflex and two `obstacle holds position` yields from the box, ending in
+What the recorded dynamic take shows, stated exactly: 11 `SLOWING` episodes on
+the reflex and one `obstacle holds position` yield from the box, ending in
 `Reached the goal!`. It has **no** `BLOCKED → 1 s hold → mark → replan` event —
 the scripted box moves aside instead of staying put. That behaviour is evidenced
 by the repeat runs in §5.3 (a hold/mark/replan chain and up to nine escape plans
