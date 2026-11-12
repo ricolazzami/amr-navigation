@@ -24,7 +24,28 @@ $DC exec -T amr mkdir -p /work/log/repeat >/dev/null 2>&1 || true
 
 if [ "$MODE" = dynamic ]; then DYN=true; LOG_S=240; else DYN=false; LOG_S=200; fi
 
+# Simulation seconds to let AMCL settle before the goal is published. This is
+# deliberately measured on /clock, not with `sleep`: the mover is phase-locked
+# to the absolute simulation clock (obstacle_mover.py: t % period), so a
+# wall-clock wait made the encounter depend on how fast the host happened to
+# run the simulator, and the dynamic scenario was not reproducible.
+SETTLE_S=${SETTLE_S:-40}
+
 run_in() { $DC exec -T amr bash -lc "source /opt/ros/jazzy/setup.bash; source /work/install/setup.bash; cd /work; $1"; }
+
+# Block until the simulation clock reaches $1 seconds (not wall seconds).
+wait_sim() {
+  target=$1
+  i=0
+  while [ "$i" -lt 180 ]; do
+    c=$(run_in "timeout 5 ros2 topic echo --once /clock --field clock 2>/dev/null | sed -n 's/^sec: //p'" 2>/dev/null | tr -dc '0-9')
+    [ -n "$c" ] && [ "$c" -ge "$target" ] && return 0
+    i=$((i + 1))
+    sleep 2
+  done
+  echo "warn: simulation clock never reached ${target}s" >&2
+  return 1
+}
 
 for i in $(seq 1 "$N"); do
   tag=$(printf '%s_%02d' "$MODE" "$i")
@@ -37,7 +58,7 @@ for i in $(seq 1 "$N"); do
     "source /opt/ros/jazzy/setup.bash; source /work/install/setup.bash; cd /work; \
      exec ros2 launch amr_bringup demo.launch.py headless:=true rviz:=false dynamic:=$DYN \
      > /work/log/repeat_$tag.log 2>&1"
-  sleep 55
+  wait_sim "$SETTLE_S"
 
   $DC exec -T -d amr bash -lc \
     "source /opt/ros/jazzy/setup.bash; source /work/install/setup.bash; cd /work; \
