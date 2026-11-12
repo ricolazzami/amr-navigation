@@ -30,11 +30,29 @@ avoidance_node:
     # Progress-based stall: commanded forward but not actually moving (also when
     # the controller has gone quiet mid-path). cmd_ttl keeps the last command
     # meaningful for stall detection a little longer than the watchdog.
-    stall_eps: 0.03
+    #
+    # 0.10, not 0.03: at the standoff the ramp still lets the robot creep a few
+    # centimetres a second, which is the same order as 0.03 was, so the hold
+    # timer kept re-arming and 2 of 3 probe runs marked nothing. The ramp caps
+    # the speed at pinch_fraction*v_max = 0.039 m/s, so 0.10 m in one window
+    # still means "no progress" while 0.24 m/s cruising refreshes well inside it.
+    stall_eps: 0.10
     cmd_ttl: 3.0
     # 1 s per spec: hold, then mark the cell and let the planner re-route
     wait_before_mark: 1.0
     mark_period: 1.5
+    # Only mark when the obstacle is what holds the robot, not the controller's
+    # own braking: ramp below 15 % of max_speed counts as "held".
+    pinch_fraction: 0.15
+    # ...and let a single lost tick slide. A shallow standoff sits on the pinch
+    # threshold and flickers across it (obs_d 0.334-0.36 vs a 0.350 m edge), so
+    # resetting on every unpinned tick pinned the hold at 0.6 s and marked
+    # nothing, while a deep standoff of 0.22 m marked fine.
+    pinch_grace: 0.5
+    # Per-tick hold-timer diagnostics; off by default. The measured hold time
+    # is logged with each mark instead (`obstacle held N s`), and the mover
+    # logs why each yield ended, so this is only for chasing a specific run.
+    debug_stall: false
     # recovery manoeuvre when the reflex has pinned the robot for too long
     recovery_after: 2.5
     recovery_period: 2.0

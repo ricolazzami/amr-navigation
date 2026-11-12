@@ -52,7 +52,7 @@ label "$DYNAMIC" "$WORK/02-dynamic.mp4" "Mission 2 — moving obstacle, dynamic 
 card "$WORK/03-end.mp4" 8 \
   "Measured results" \
   "static 10/10 · dynamic 10/10 · 0 contact · 0 oscillation per approach" \
-  "src/amr_planning · src/amr_control · docs/report.md"
+  "every dynamic run held >= 1 s → marked the cell → replanned (docs/report.md)"
 
 echo "== fit to ${MAX_TOTAL}s"
 d_static=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WORK/01-static.mp4")
@@ -60,12 +60,17 @@ d_dyn=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WORK/02-dyn
 total=$(python3 -c "print(6+$d_static+$d_dyn+8)")
 echo "   title 6 + static ${d_static} + dynamic ${d_dyn} + end 8 = ${total}s"
 if python3 -c "import sys; sys.exit(0 if $total > $MAX_TOTAL else 1)"; then
-  # Trim the fat off both segments equally so each keeps its arrival.
+  # Trim the *head*, not the tail. `-t N` on the output keeps the first N
+  # seconds, and each segment's payoff is at the end: the arrival, and on the
+  # dynamic leg the hold -> mark -> replan the video exists to show. Dropping
+  # the first seconds only costs idle RViz while the robot waits for its goal.
   keep=$(python3 -c "print(round(($MAX_TOTAL-14)*($d_static/ ($d_static+$d_dyn)),1))")
   keep2=$(python3 -c "print(round($MAX_TOTAL-14-$keep,1))")
-  echo "   over budget -> static ${keep}s, dynamic ${keep2}s"
-  ffmpeg -hide_banner -loglevel error -y -i "$WORK/01-static.mp4" -t "$keep" "${common[@]}" "$WORK/01-static-t.mp4"
-  ffmpeg -hide_banner -loglevel error -y -i "$WORK/02-dynamic.mp4" -t "$keep2" "${common[@]}" "$WORK/02-dynamic-t.mp4"
+  skip=$(python3 -c "print(max(0.0, round($d_static-$keep,1)))")
+  skip2=$(python3 -c "print(max(0.0, round($d_dyn-$keep2,1)))")
+  echo "   over budget -> static skip ${skip}s keep ${keep}s, dynamic skip ${skip2}s keep ${keep2}s"
+  ffmpeg -hide_banner -loglevel error -y -ss "$skip" -i "$WORK/01-static.mp4" -t "$keep" "${common[@]}" "$WORK/01-static-t.mp4"
+  ffmpeg -hide_banner -loglevel error -y -ss "$skip2" -i "$WORK/02-dynamic.mp4" -t "$keep2" "${common[@]}" "$WORK/02-dynamic-t.mp4"
   mv "$WORK/01-static-t.mp4" "$WORK/01-static.mp4"
   mv "$WORK/02-dynamic-t.mp4" "$WORK/02-dynamic.mp4"
 fi

@@ -26,17 +26,32 @@ obstacle_mover:
     # sweep, 0.6 m off the lane and outside the 0.18 m corridor, so the robot
     # sailed past an obstacle it could not see. Same 0.18 m as amr_control's
     # corridor_half_width, so both nodes agree on what "in the way" means.
+    # This pair is now only the *proximity* hold, which stops the teleported box
+    # overlapping the robot; the encounter itself is staged, see guard_lead.
     guard_radius: 0.75
     guard_lateral: 0.18
-    # How long the box yields before it sweeps on: long enough for the reflex's
-    # 1 s hold, mark and replan, short enough that a frozen box cannot wall the
-    # robot in forever.
+    # The staged encounter, which is what makes the dynamic scenario repeatable.
+    # The sweep alone missed the robot on some runs: measured, the robot reaches
+    # x = 0.5 anywhere in 71.5-74.9 sim s, while the box is inside the 0.18 m
+    # corridor for only a slice of its 9 s period, so sometimes the box crossed
+    # for 0.6 s - shorter than the reflex's 1 s hold - and swept on, and
+    # sometimes it reached the lane only after the robot had driven past. The
+    # first time the robot comes within guard_lead of the crossing line the box
+    # is placed in the robot's lane a little ahead of it and holds until the
+    # robot is release_margin past. Once per run.
+    guard_lead: 1.2
+    release_margin: 0.5
+    # How long the box yields before it sweeps on, whatever the robot does: long
+    # enough for the reflex's 1 s hold, mark and replan, short enough that a
+    # frozen box cannot wall the robot in forever. The staged hold ends earlier
+    # once the robot is past the crossing line.
     hold_max_s: 6.0
-    # Where in the 9 s sweep the box sits when the first plan arrives. The robot
-    # crosses x = 0.5 at 22.0-22.2 sim s after the plan (measured) and comes
-    # inside the 0.75 m guard radius at ~19.4 s; the box crosses the lane
-    # (y = -4.33, the y the A* route uses on the east leg) at 1.77 s and 7.23 s
-    # into a sweep, so 0.7 s puts it 0.02 m off the lane at 19.4 s and within
-    # 0.14 m of it across a +/-0.3 s spread. The freeze then lands squarely in
-    # the 0.18 m corridor. Measured, not guessed: docs/metrics/README.md
+    # Cap for the proximity hold, which exists only to keep the teleported box
+    # from overlapping the robot and is not meant to stage a second encounter.
+    hold_max_near_s: 2.0
+    # Where in the 9 s sweep the box sits when the first plan arrives. Now only
+    # cosmetic - it decides where the box is *before* the staged encounter - but
+    # 0.7 s still puts it near the lane as the robot starts out, so the run looks
+    # like a sweep that is interrupted rather than a box sitting in ambush.
+    # Measured, not guessed: docs/metrics/README.md
     phase_offset: 0.7

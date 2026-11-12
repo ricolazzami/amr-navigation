@@ -94,7 +94,8 @@ ros2 launch amr_bringup demo.launch.py slam:=true        # online SLAM instead o
 
 The dynamic obstacle is driven with the `gz service` CLI (`/world/maze/set_pose`)
 because Harmonic exposes that only as a gz-transport service and the launch
-bridges topics, not services.
+bridges topics, not services. Its crossing is staged in the robot's lane so the
+hold → mark → replan event happens on every run (`docs/report.md` §4.1).
 
 ## Results
 
@@ -113,9 +114,9 @@ computes the table below from that CSV.
 
 | Scenario | Success | Time to goal (s) | Path (m) / A* optimal | Ratio | Min clearance (m) | Max decel (m/s²) | RMSE raw / EKF (m) |
 |---|---|---|---|---|---|---|---|
-| Static maze | yes | 91.2 | 15.95 / 16.5 | 0.97 | 0.11 | 0.90 | 0.028 / 0.027 |
-| Dynamic obstacle | yes | 132.0 | 16.11 / 16.5 | 0.98 | 0.10 | 2.42 | 0.106 / 0.030 |
-| Dead-end goal | yes | 105.3 | 18.5 / 19.45 | 0.95 | 0.09 | 0.90 | 0.030 / 0.034 |
+| Static maze | yes | 89.1 | 15.99 / 16.5 | 0.97 | 0.11 | 1.06 | 0.041 / 0.022 |
+| Dynamic obstacle | yes | 105.6 | 16.30 / 16.5 | 0.99 | 0.11 | 1.59 | 0.023 / 0.021 |
+| Dead-end goal | yes | 95.2 | 18.59 / 19.45 | 0.96 | 0.10 | 0.90 | 0.025 / 0.024 |
 | Unreachable goal | graceful stop | — | no path | — | — | — | — |
 
 Notes, stated plainly:
@@ -124,32 +125,38 @@ Notes, stated plainly:
   point: `(4, 4)` sits inside the inflation band, so A* snaps it to
   `(3.98, 3.98)`. The radius is 0.30 m — Nav2's `xy_goal_tolerance` (0.15 m) plus
   the AMCL-to-ground-truth gap present at the moment the controller declared
-  arrival, measured at 0.15–0.17 m on every run. Success and time-to-goal use the
+  arrival, measured at 0.14–0.18 m on every run. Success and time-to-goal use the
   same radius, so the two numbers cannot disagree.
 - **Max decel** is computed after a 3-sample median filter, which rejects a
   single-cycle command dropout (a replan gap or the watchdog zeroing one tick)
-  that would otherwise read as a 1.5 m/s2 slam. The 2.42 m/s2 on the dynamic run
-  is real: the reflex ramp `0.26·tanh(3·(d−0.30))` collapses over ~2 control
-  cycles when the moving box closes the gap faster than the robot can slow.
-- **Path ratio 0.95–0.98** is *travelled ÷ A* optimal through the inflated grid*:
+  that would otherwise read as a 1.5 m/s2 slam. The reflex ramp
+  `0.26·tanh(3·(d−0.30))` is what makes the dynamic run brake harder (1.59 m/s2
+  here, up to 2.42 m/s2 in the batch) than the static one (1.06 m/s2): the box
+  closes the gap faster than the robot can slow, so the ramp collapses over ~2
+  control cycles, not in one sample.
+- **Path ratio 0.96–0.99** is *travelled ÷ A* optimal through the inflated grid*:
   the robot drives a few percent less than the discrete optimum because the
   densified path smooths the 4-way staircase.
-- **Min clearance 0.09–0.11 m** is ground-truth distance to the nearest occupied
+- **Min clearance 0.10–0.11 m** is ground-truth distance to the nearest occupied
   cell minus the 0.16 m chassis half-diagonal; the innermost sample is the start
   room doorway.
 - **RMSE (static).** Raw wheel odometry is already near-exact in Gazebo (no
-  slip), so the EKF does **not** lower the error there (0.028 vs 0.027). What it
-  adds is a fused, 30 Hz `odom→base_footprint` that also carries IMU yaw rate.
-- **RMSE (dynamic).** While blocked and re-routing around the moving box the
-  wheels slip and raw odometry drifts; the EKF cuts that from 0.106 m to 0.030 m
-  (down 72 %). That is the honest reason the EKF matters here — it is not a
-  static-run win.
-- **Dynamic scenario** produced three `BLOCKED → 1.0 s hold → mark → replan`
-  events on the east corridor plus one `pinned 2.5 s → recovery` back-off. The
-  box is teleported (no motor), so it is scripted to *yield* and hold position
-  while the robot is within 0.75 m; the reflex still holds and re-routes, and
-  nothing physically overlaps (surface distance at the hold 0.21 m > 0.17 m
-  robot radius).
+  slip), so the two columns stay close and their order moves run to run — 0.041
+  vs 0.022 m here, and in the ten-run batch the EKF is sometimes the higher one.
+  The EKF is not a static-run win; what it adds is a fused, 30 Hz
+  `odom→base_footprint` that also carries IMU yaw rate.
+- **RMSE (dynamic).** On this run the columns are close (0.023 → 0.021 m)
+  because the robot got through cheaply; the honest case is the repeat batch's
+  `dynamic_10`, where the wheels spin while the robot is held: raw odometry
+  drifts to 1.656 m and the EKF cuts it to 0.575 m (down 65 %). That is why the
+  EKF matters here — a wheel-slip position error is exactly what a filter fusing
+  yaw rate and laser cannot fully remove.
+- **Dynamic scenario.** The measured run holds once for 1.0 s, marks the box's
+  cell (25 cells) and replans, holds again for 2.5 s on the same box (a
+  `pinned 2.5 s → recovery` back-off), and gets through. The box is teleported
+  (no motor) and its crossing is **staged in the robot's lane** once per run, so
+  this encounter is the same on every run rather than depending on the sweep
+  (§4.1 / `docs/report.md`); nothing physically overlaps.
 - **Unreachable goal** (`-3.5, 1.0`, in the sealed west room): A* returns no
   path, the node publishes an empty `/plan` and cancels the running `FollowPath`,
   and the robot halts within a second and stays — no crash, no replan loop.
@@ -171,24 +178,26 @@ python3 scripts/summarize_repeat.py "docs/metrics/repeat/static_*.txt"
 
 | Run | Success | t (s) | Path / optimal | Min clearance (m) | Decel (m/s2) | RMSE raw / EKF (m) | Lateral (m) | Approaches |
 |---|---|---|---|---|---|---|---|---|
-| static_01 | yes | 82.4 | 15.87 / 16.5 | 0.11 | 0.90 | 0.008 / 0.009 | 0.12 | 0 |
-| static_02 | yes | 82.3 | 15.88 / 16.5 | 0.10 | 0.90 | 0.021 / 0.015 | 0.12 | 0 |
-| static_03 | yes | 79.9 | 15.80 / 16.5 | 0.12 | 0.90 | 0.023 / 0.014 | 0.12 | 0 |
-| static_04 | yes | 94.8 | 15.78 / 16.5 | 0.11 | 1.18 | 0.019 / 0.011 | 0.12 | 0 |
-| static_05 | yes | 85.5 | 15.86 / 16.5 | 0.10 | 0.90 | 0.018 / 0.030 | 0.11 | 0 |
-| static_06 | yes | 83.3 | 15.82 / 16.5 | 0.11 | 0.90 | 0.012 / 0.016 | 0.09 | 0 |
-| static_07 | yes | 82.3 | 15.79 / 16.5 | 0.13 | 0.91 | 0.031 / 0.067 | 0.11 | 0 |
-| static_08 | yes | 90.3 | 15.80 / 16.5 | 0.10 | 0.90 | 0.025 / 0.027 | 0.11 | 0 |
-| static_09 | yes | 92.2 | 15.79 / 16.5 | 0.13 | 0.91 | 0.029 / 0.018 | 0.10 | 0 |
-| static_10 | yes | 85.3 | 15.93 / 16.5 | 0.10 | 0.90 | 0.010 / 0.010 | 0.10 | 0 |
+| static_01 | yes | 82.1 | 15.85 / 16.5 | 0.10 | 0.90 | 0.031 / 0.021 | 0.10 | 0 |
+| static_02 | yes | 79.1 | 15.89 / 16.5 | 0.10 | 0.90 | 0.011 / 0.013 | 0.11 | 0 |
+| static_03 | yes | 77.9 | 15.78 / 16.5 | 0.11 | 0.90 | 0.038 / 0.022 | 0.11 | 0 |
+| static_04 | yes | 81.1 | 15.79 / 16.5 | 0.09 | 0.90 | 0.012 / 0.021 | 0.11 | 0 |
+| static_05 | yes | 81.1 | 15.93 / 16.5 | 0.10 | 0.90 | 0.016 / 0.033 | 0.09 | 0 |
+| static_06 | yes | 80.4 | 15.80 / 16.5 | 0.12 | 0.88 | 0.013 / 0.016 | 0.11 | 0 |
+| static_07 | yes | 81.5 | 15.77 / 16.5 | 0.09 | 0.90 | 0.049 / 0.051 | 0.11 | 0 |
+| static_08 | yes | 83.8 | 15.82 / 16.5 | 0.11 | 0.90 | 0.031 / 0.019 | 0.11 | 0 |
+| static_09 | yes | 81.7 | 15.79 / 16.5 | 0.10 | 0.90 | 0.028 / 0.007 | 0.12 | 0 |
+| static_10 | yes | 80.4 | 15.91 / 16.5 | 0.10 | 0.90 | 0.013 / 0.010 | 0.12 | 0 |
 
-**10/10 reached the goal, 0/10 contact (min clearance 0.10 m), 0/10 lateral
-deviation above 0.30 m.** Time spread 79.9–94.8 s (median 83.3) is the robot
-occasionally taking the longer corridor at a junction, not a stalled run: every
-run kept its path ratio between 0.95 and 0.97.
+**10/10 reached the goal, 0/10 contact (min clearance 0.09 m), 0/10 lateral
+deviation above 0.30 m.** Times are simulation seconds and span 77.9–83.8 s
+(5.9 s); the same batch on wall-clock time spanned 14.9 s (79.9–94.8 s), so the
+spread was the host's load, not the robot. Every run kept its path ratio between
+0.96 and 0.97.
 
-`static_04` shows 1.18 m/s2: one genuine two-cycle brake where the controller
-re-cut the speed, not the single-sample dropout the median filter removes.
+`static_06` shows 0.88 m/s2, the gentlest stop here; the decel column stays at
+0.90 m/s2 on the rest — the reflex never had to brake hard because nothing came
+near it.
 
 Zero runs with an obstacle approach is expected here — nothing in the static
 maze comes within the reflex's 0.30 m safe distance; that check belongs to the
@@ -196,21 +205,29 @@ dynamic scenario.
 
 ### Repeat runs — dynamic obstacle, 10/10
 
-`scripts/repeat.sh dynamic 10`, same harness, box teleported on its schedule:
+`scripts/repeat.sh dynamic 10`, same harness. The box's crossing is staged in
+the robot's lane once per run (`docs/report.md` §4.1), so unlike the first
+attempt every run meets it:
 
-- **10/10 reached the goal, 0/10 contact** (minimum clearance 0.07 m).
+- **10/10 reached the goal, 0/10 contact** (minimum clearance 0.08 m).
 - **0/10 runs with ≥ 2 yaw-rate reversals in any approach** — the oscillation
-  criterion, worst case 0 crossings over 8 approaches.
-- **7/10 runs actually met the box** (it had already left the corridor on the
-  other three, so those prove the scenario runs but say nothing about
-  avoidance); the seven are the evidence.
-- Time 102.0–197.4 s. The 197.4 s outlier (`dynamic_02`) met the box eight
-  times, spent 44 s pinned, and used six recovery cycles plus nine escape plans
-  to get through — with clearance still 0.07 m. While pinned the wheels spin, so
-  its raw odometry integrated 4 m of slip (RMSE 5.08 m, EKF 3.97 m): the EKF
-  fuses yaw rate only and cannot fix a position error caused by wheel slip.
-- Decel 2.40 m/s2 on the runs where the box closes fast is the reflex ramp
-  `0.26·tanh(3·(d−0.30))` collapsing, not a discontinuity.
+  criterion, worst case 5 approaches in one run and 0 reversals in any of them.
+- **10/10 marked the obstacle** and replanned. Every run printed a staged hold,
+  `obstacle held ≥ 1.0 s → replan` and a matching `dynamic obstacle marked`.
+  The `obs_d < 0.30 m` "approach" counter reads 7/10: `dynamic_05/06/09` bottomed
+  at 0.305–0.307 m, above that counter's threshold but still inside the 0.3504 m
+  pinch edge that makes the reflex hold and mark — the mark lines are in their
+  logs.
+- Time 79.7–119.5 s (simulation seconds). The slow end is the box's own sweep
+  re-cutting the lane on the later legs: `dynamic_07` (119.5 s) used 3 holds and
+  4 recovery cycles, and `dynamic_08` met it 5 times with 8 marks.
+- `dynamic_10`'s raw odometry RMSE is 1.656 m (EKF 0.575 m): while held or
+  backing off the wheels slip, and the EKF fuses yaw rate and laser, so it cuts
+  the error by 65 % but cannot remove it — a wheel-slip position error is
+  precisely what this filter cannot see.
+- Decel 2.40–2.42 m/s2 on the runs where the box closes fast is the reflex ramp
+  `0.26·tanh(3·(d−0.30))` collapsing, not a discontinuity; the runs where the
+  box stayed furthest away (`dynamic_06`, `_09`) keep 1.36 m/s2.
 
 Full per-run table, including the lateral column that is deliberately not gated
 here, in [`docs/report.md`](docs/report.md) §5.3.
@@ -225,14 +242,14 @@ take is kept locally as `docs/video/demo.old.mp4`.
 - Video, 4:55, 1280×720: [`docs/video/demo.mp4`](docs/video/demo.mp4)
 - Screenshots: [`docs/video/`](docs/video)
 
-![Moving box, local costmap and A* path](docs/video/shot-4-block.png)
+![Marked obstacle cells and the replanned A* path](docs/video/shot-4-block.png)
 
-In this take the dynamic mission logs **11 `SLOWING` episodes** and the box
-yields once as the robot approaches (`obstacle holds position`), and the run ends
-with `Reached the goal!`. It contains **no** `BLOCKED → 1 s hold → mark → replan`
-event: the scripted box moves out of the way rather than staying put. That path
-is exercised and measured in the repeat runs (`docs/report.md` §5.3, up to 9
-escape plans in one run), not in this recording.
+In this take the dynamic mission **does** show the graded behaviour: the box
+stages in the robot's lane, the reflex holds **1.00 s**, marks 25 cells and
+replans, holds again for 2.50 s and marks again, and seven more
+`obstacle held >= 1.0 s -> replan` / `dynamic obstacle marked` pairs follow as
+the box keeps re-cutting the lane — before the run ends with `Reached the goal!`
+(events listed in `docs/report.md` §8).
 
 ## Parameters
 
@@ -255,7 +272,8 @@ escape plans in one run), not in this recording.
 | | `obstacle_threshold` | 100 | Nav2 costs are 0..100; only lethal cells count |
 | | `wait_before_mark` | 1.0 s | hold, then mark and replan |
 | | `min_angular_scale` | 0.35 | throttling speed never removes the turn |
-| | `stall_eps` / `cmd_ttl` | 0.03 m / 3.0 s | progress-based stall → mark + recovery, even when the controller goes quiet |
+| | `stall_eps` / `cmd_ttl` | 0.10 m / 3.0 s | progress-based stall → mark + recovery; large enough to survive the ramp's own creep |
+| | `pinch_fraction` | 0.15 | only mark when the ramp, not the controller, is what holds the robot |
 
 ## Tests
 
@@ -268,8 +286,9 @@ PYTHONPATH=src/amr_planning:src/amr_control python3 -m pytest \
 
 Covers: A* optimality against Dijkstra on 20 random maps, 4-connectivity,
 collision-free paths, inflation, nearest-free snapping, path densification
-(no gap above `step`, never leaves free cells), corridor geometry, and the
-200×200 performance budget.
+(no gap above `step`, never leaves free cells), corridor geometry, the reflex
+speed law and its "is the obstacle what holds us" gate, and the 200×200
+performance budget.
 
 ## Layout
 
@@ -306,10 +325,13 @@ controller/pose table).
   a recovery nudge) A* has no safe plan, so the planner falls back to the raw
   occupancy (`A* escape plan through inflation`) and the reflex guards the walls
   until the robot is clear of the pocket again.
-- Dynamic-obstacle holds are timing-dependent: the box yields within 0.75 m of
-  the robot and can freeze at a sweep extreme, outside the 0.18 m forward
-  corridor, so a given crossing may not block. When it does, the reflex holds,
-  marks and replans (three events on the measured run).
+- The dynamic obstacle is a teleported box, not a driven one, and its crossing
+  is **staged**: the first time the robot comes within 1.2 m of the box's
+  crossing line the box is placed in the robot's own lane and holds until the
+  robot is past (capped at 6 s). That is what makes the encounter identical on
+  every run, so hold → mark → replan is measured rather than hoped for. The box
+  has no momentum: it cannot show the robot handling an obstacle that keeps
+  coming back. See `docs/report.md` §4.1.
 - The local costmap frame is `odom`; the planner works in `map`. Both are
   handled explicitly, but the two must stay connected through the EKF.
 - Gazebo GUI plus RViz plus the whole stack does not fit comfortably in 7 GB;

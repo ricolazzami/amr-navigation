@@ -12,36 +12,26 @@ import pytest
 
 pytest.importorskip("rclpy")
 
-from amr_bringup.obstacle_mover import sweep_value  # noqa: E402
+from amr_bringup.obstacle_mover import (  # noqa: E402
+    lead_triggered,
+    stage_target,
+    sweep_value,
+)
 
 LO, HI, PERIOD = -4.8, -3.4, 9.0
 OFFSET = 0.7
 GUARD_R = 0.75
 GUARD_LAT = 0.18        # == amr_control's corridor_half_width
+GUARD_LEAD = 1.2        # the staged encounter's look-ahead
+RELEASE_MARGIN = 0.5
 HOLD_MAX = 6.0          # s the box will yield before sweeping on
+HOLD_MAX_NEAR = 2.0
 LANE_Y = -4.33          # the y the A* route uses on the east leg
-ROBOT_Y = -4.20         # measured, on the east leg
-# Measured from the probe CSVs: the robot comes inside the 0.75 m guard radius at
-# ~19.4 s after the first plan and crosses x = 0.5 at 22.0-22.2 s (was
-# 22.0-23.4 before the phase was anchored to the plan, and arbitrary before that).
-FREEZE_S = 19.4
-ARRIVAL_S = 22.1
 YAML = pathlib.Path(__file__).parents[1] / "config" / "obstacle_mover.yaml"
 
 
 def _box_y(dt: float) -> float:
     return sweep_value(dt, OFFSET, PERIOD, LO, HI)
-
-
-def _crossings(level: float, spans: float = 3.0) -> list[float]:
-    """``dt`` values in the first few cycles where the box reaches ``level``."""
-    out: list[float] = []
-    for step in range(int(spans * PERIOD * 100)):
-        dt = step * 0.01
-        if abs(_box_y(dt) - level) < 0.02:
-            if not out or dt - out[-1] > 0.5:
-                out.append(round(dt, 2))
-    return out
 
 
 def test_phase_is_anchored_not_clock_locked():
@@ -74,22 +64,6 @@ def test_anchor_topic_is_not_goal_pose():
     assert 'create_subscription(Path, "/plan"' in body
 
 
-def test_box_is_in_the_corridor_when_the_guard_fires():
-    """The freeze has to land where the reflex can see it.
-
-    With the old radius-only guard the box froze at the bottom of the sweep,
-    ~0.6 m off the lane and outside the 0.18 m corridor: obs_d stayed inf and
-    the run tested nothing. It must be inside the corridor at the freeze
-    instant, and stay inside across the +/-0.3 s uncertainty in that instant.
-    """
-    for dt in (FREEZE_S - 0.3, FREEZE_S, FREEZE_S + 0.3):
-        off_lane = abs(_box_y(dt) - ROBOT_Y)
-        assert off_lane <= GUARD_LAT, (
-            f"at t - t_plan = {dt:.1f} s the box is {off_lane:.2f} m off the "
-            f"lane, outside the {GUARD_LAT} m corridor; retune phase_offset"
-        )
-
-
 def test_the_guard_lateral_is_the_reflex_corridor():
     """Both nodes must mean the same thing by "in the robot's way"."""
     avoidance = YAML.parent / "avoidance.yaml"
@@ -99,14 +73,60 @@ def test_the_guard_lateral_is_the_reflex_corridor():
     assert got == pytest.approx(GUARD_LAT)
 
 
-def test_box_reaches_the_lane_as_the_guard_starts_holding_it():
-    # A lane crossing ~1 s either side of the freeze instant: the box is at (or
-    # just short of) the lane exactly when the guard stops it, which is what
-    # puts it in the corridor rather than at the bottom of the sweep.
-    crossings = _crossings(LANE_Y)
-    assert crossings, "the box never crosses the lane"
-    assert [c for c in crossings if FREEZE_S - 1.0 <= c <= ARRIVAL_S], (
-        f"no lane crossing near the freeze ({FREEZE_S} s); crossings {crossings}"
+def test_staging_puts_the_box_in_the_robot_lane_not_where_the_sweep_is():
+    """The fix for the missed encounters: the box goes to the robot's lane.
+
+    The sweep was timed against the robot's arrival and still missed it on some
+    runs (the robot takes 71.5-74.9 sim s to reach x = 0.5 and the box is only in
+    the 0.18 m corridor for a slice of its 9 s period). Staging uses the robot's
+    own y, so the box is squarely in the lane whatever the phase - and the
+    clamping keeps it inside the world it sweeps.
+    """
+    box = stage_target("y", 0.5, LO, HI, robot_x=-0.7, robot_y=-4.20)
+    assert box == pytest.approx((0.5, -4.20))
+    # latched, and clamped to the sweep range rather than following the robot off
+    # the edge of the world
+    assert stage_target("y", 0.5, LO, HI, robot_x=-0.7, robot_y=-9.0)[1] == LO
+    assert stage_target("y", 0.5, LO, HI, robot_x=-0.7, robot_y=+9.0)[1] == HI
+
+
+def test_staging_fires_before_the_crossing_and_only_once():
+    """The look-ahead band: in front of the robot, never behind it."""
+    line, lead = 0.5, 1.2
+    assert lead_triggered(0.5 - 1.1, line, lead)      # approaching, in band
+    assert not lead_triggered(0.5 - 1.9, line, lead)  # still too far
+    assert not lead_triggered(0.5, line, lead)        # on the line
+    assert not lead_triggered(0.5 + 0.1, line, lead)  # already past it
+    assert not lead_triggered(None, line, lead)       # no transform yet
+
+
+def test_the_encounter_is_staged_not_left_to_the_sweep():
+    # The sweep is cosmetic now; the encounter hangs off guard_lead. Asserts the
+    # wiring, the way test_anchor_topic_is_not_goal_pose does for the anchor.
+    src = pathlib.Path(
+        __import__("amr_bringup.obstacle_mover", fromlist=["x"]).__file__
+    ).read_text()
+    body = src.split('"""', 2)[2]
+    assert "stage_target(" in body and "lead_triggered(" in body
+    assert "self._froze_once" in body
+
+
+def test_no_parameter_attribute_shadows_a_method():
+    """A `self._release = <float>` shadowed `_release()` and killed the node.
+
+    The mover died with `TypeError: 'float' object is not callable` the first
+    time a hold ended, which parked the box in the robot's lane for the rest of
+    the run. Nothing in a unit test runs `_tick`, so pin the naming instead: no
+    attribute assigned in __init__ may share a name with a method.
+    """
+    src = pathlib.Path(
+        __import__("amr_bringup.obstacle_mover", fromlist=["x"]).__file__
+    ).read_text()
+    methods = set(re.findall(r"^    def ([a-z_]+)\(", src, re.M))
+    assigned = set(re.findall(r"^\s+self\.([a-z_]+)\s*=", src, re.M))
+    assert not (methods & assigned), (
+        f"these attributes shadow methods and would call as a TypeError: "
+        f"{sorted(methods & assigned)}"
     )
 
 
@@ -127,8 +147,9 @@ def test_lane_crossing_times_are_the_documented_ones():
 def test_values_match_the_shipped_yaml():
     text = YAML.read_text()
     got = {}
-    for key in ("y_min", "y_max", "period", "phase_offset",
-                "guard_radius", "guard_lateral", "hold_max_s"):
+    for key in ("y_min", "y_max", "period", "phase_offset", "guard_radius",
+                "guard_lateral", "guard_lead", "release_margin", "hold_max_s",
+                "hold_max_near_s"):
         got[key] = float(re.search(rf"^\s*{key}:\s*([-\d.]+)", text, re.M).group(1))
     assert got == {
         "y_min": LO,
@@ -137,5 +158,8 @@ def test_values_match_the_shipped_yaml():
         "phase_offset": OFFSET,
         "guard_radius": GUARD_R,
         "guard_lateral": GUARD_LAT,
+        "guard_lead": GUARD_LEAD,
+        "release_margin": RELEASE_MARGIN,
         "hold_max_s": HOLD_MAX,
+        "hold_max_near_s": HOLD_MAX_NEAR,
     }

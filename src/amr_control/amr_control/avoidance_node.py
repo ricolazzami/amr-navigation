@@ -26,6 +26,7 @@ from std_msgs.msg import Float32
 from tf2_geometry_msgs import do_transform_point
 
 from amr_control.grid_view import CostmapView
+from amr_control.reflex import holds_robot, ramp_speed
 
 
 class AvoidanceNode(Node):
@@ -59,6 +60,16 @@ class AvoidanceNode(Node):
         self.declare_parameter("watchdog_timeout", 0.5)
         self.declare_parameter("wait_before_mark", 1.0)   # <-- 1 s, per spec
         self.declare_parameter("mark_period", 1.5)
+        # Below this fraction of max_speed the obstacle (not the controller) is
+        # what is holding the robot: only then is the cell marked as blocked.
+        self.declare_parameter("pinch_fraction", 0.15)
+        # How long the hold timer survives without a pin before restarting. The
+        # costmap loses the obstacle for a tick at control rate, and a standoff
+        # sitting on the pinch threshold flickers across it, so a single missed
+        # tick must not restart the 1 s hold.
+        self.declare_parameter("pinch_grace", 0.5)
+        # Diagnostic only: explain the hold timer tick by tick.
+        self.declare_parameter("debug_stall", False)
 
         # recovery: back off and turn when the robot has been pinned this long
         self.declare_parameter("recovery_after", 2.5)
@@ -96,6 +107,11 @@ class AvoidanceNode(Node):
         self._recovery_reverse = float(gp("recovery_reverse").value)
         self._recovery_reverse_time = float(gp("recovery_reverse_time").value)
         self._recovery_rotate = float(gp("recovery_rotate").value)
+        self._pinch_fraction = float(gp("pinch_fraction").value)
+        self._pinch_grace = float(gp("pinch_grace").value)
+        self._last_pinch = -1e9
+        self._debug_stall = bool(gp("debug_stall").value)
+        self._last_dbg = -1e9
 
         if self._d_min >= self._d_safe:
             self.get_logger().warn(
@@ -202,11 +218,13 @@ class AvoidanceNode(Node):
 
         target = self._v_max
         if distance is not None:
-            if distance <= self._d_min:
-                target = 0.0
-            else:
-                target = self._v_max * math.tanh(self._k * (distance - self._d_safe))
-                target = max(0.0, min(self._v_max, target))
+            target = ramp_speed(
+                distance,
+                v_max=self._v_max,
+                d_safe=self._d_safe,
+                k=self._k,
+                d_min=self._d_min,
+            )
 
         cmd = self._cmd
         if cmd.linear.x < 0.0:
@@ -235,19 +253,52 @@ class AvoidanceNode(Node):
         )
 
     def _track_stall(self, now: float, want: float, distance, ox: float, oy: float) -> bool:
-        """Mark the obstacle and schedule recovery when asked forward but stuck.
+        """Mark the obstacle cell once it has held the robot for the spec's 1 s.
 
-        Returns ``True`` while the robot is pinned. Unlike a speed test this
-        looks at *actual* motion, so it also fires when the controller has gone
-        quiet mid-path (the WATCHDOG standoff).
+        Returns ``True`` while the robot is pinned, and schedules the recovery
+        manoeuvre once the pin outlasts ``recovery_after``. The hold is judged on
+        the *obstacle*, not on the robot: the ramp keeps a little speed and the
+        pose comes from AMCL, so a motion test alone flickers.
         """
-        if want <= 0.02:
-            self._stall_ref = None
-            self._stall_since = now
+        def dbg(reason: str, moved: float, elapsed: float) -> None:
+            if not self._debug_stall or (now - self._last_dbg) < 0.4:
+                return
+            if distance is None:
+                # Nothing in the corridor at all: not an encounter.
+                return
+            self._last_dbg = now
+            self.get_logger().info(
+                f"stall[{reason}] want={want:.3f} d={distance:.3f} "
+                f"moved={moved:.3f} elapsed={elapsed:.2f} "
+                f"pinch={self._holds_robot(distance)}"
+            )
+
+        # Both halves of "the obstacle is holding us": a recent command still
+        # asks for forward (cmd_ttl keeps a controller that has gone quiet
+        # meaningful), and the ramp - not the controller - is what cuts the
+        # speed. A corridor that is clear counts as no hold; a *lost* corridor
+        # does not, see the grace below.
+        pinched = want > 0.02 and distance is not None and self._holds_robot(distance)
+
+        if not pinched:
+            # Do not restart the clock for a single tick. The costmap drops the
+            # box for a tick at control rate, and a shallow standoff sits right
+            # on the pinch threshold and flickers across it (measured: obs_d
+            # oscillating 0.334-0.36 against a 0.350 m threshold), which pinned
+            # elapsed at 0.6 s and marked nothing while a *deeper* standoff of
+            # 0.22 m marked fine. Same 1 s hold, opposite outcomes, purely from
+            # that flicker.
+            if (now - self._last_pinch) > self._pinch_grace:
+                self._stall_ref = None
+                self._stall_since = now
+            dbg("notpinched", float("nan"), 0.0)
             return False
+
+        self._last_pinch = now
 
         xy = self._robot_xy()
         if xy is None:
+            dbg("notf", float("nan"), 0.0)
             return False
         if self._stall_ref is None:
             self._stall_ref = xy
@@ -256,16 +307,21 @@ class AvoidanceNode(Node):
 
         moved = math.hypot(xy[0] - self._stall_ref[0], xy[1] - self._stall_ref[1])
         if moved > self._stall_eps:
+            # Real progress: the robot is going around the obstacle, not blocked
+            # by it.
             self._stall_ref = xy
             self._stall_since = now
+            dbg("moved", moved, 0.0)
             return False
 
         elapsed = now - self._stall_since
+        dbg("held", moved, elapsed)
+
         if elapsed < self._wait_before_mark:
             return False
 
-        if distance is not None and (now - self._last_mark) >= self._mark_period:
-            self._report_blocked(ox, oy, distance)
+        if (now - self._last_mark) >= self._mark_period:
+            self._report_blocked(ox, oy, distance, elapsed)
             self._last_mark = now
 
         if elapsed >= self._recovery_after and (now - self._last_recovery) >= self._recovery_period:
@@ -280,6 +336,17 @@ class AvoidanceNode(Node):
                 f"({'left' if self._recovery_dir > 0 else 'right'})"
             )
         return True
+
+    def _holds_robot(self, distance: float) -> bool:
+        """True while the reflex ramp is what is cutting the commanded speed."""
+        return holds_robot(
+            distance,
+            v_max=self._v_max,
+            d_safe=self._d_safe,
+            k=self._k,
+            d_min=self._d_min,
+            fraction=self._pinch_fraction,
+        )
 
     def _robot_xy(self):
         """Robot position in the map frame, or ``None`` if TF is not ready."""
@@ -342,7 +409,9 @@ class AvoidanceNode(Node):
             threshold=self._obstacle_threshold,
         )
 
-    def _report_blocked(self, x: float, y: float, distance: float) -> None:
+    def _report_blocked(
+        self, x: float, y: float, distance: float, elapsed: float
+    ) -> None:
         point = PointStamped()
         point.header.frame_id = self._view.frame_id or self._map_frame
         point.header.stamp = self.get_clock().now().to_msg()
@@ -363,8 +432,9 @@ class AvoidanceNode(Node):
 
         self._pub_blocked.publish(out)
         self.get_logger().warn(
-            f"obstacle held for {self._wait_before_mark:.1f} s at "
-            f"({out.point.x:.2f}, {out.point.y:.2f}) d={distance:.2f} m -> replan"
+            f"obstacle held {elapsed:.2f} s (>= {self._wait_before_mark:.1f} s "
+            f"spec) at ({out.point.x:.2f}, {out.point.y:.2f}) d={distance:.2f} m "
+            f"-> replan"
         )
 
 

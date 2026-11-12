@@ -18,7 +18,12 @@ W=1280
 H=720
 FPS=25
 
-if [ "$MODE" = dynamic ]; then DYN=true; DEADLINE=220; else DYN=false; DEADLINE=160; fi
+# Deadline is wall seconds, the mission is simulation seconds, and RViz on
+# llvmpipe drags the RTF down to ~0.3-0.5: a dynamic run is ~80 sim s, so 220
+# wall seconds could cut the capture off before the robot arrives (and with it
+# the hold -> mark -> replan event the video exists to show). The loop still
+# breaks the moment the goal is reached, so a generous cap costs nothing.
+if [ "$MODE" = dynamic ]; then DYN=true; DEADLINE=400; else DYN=false; DEADLINE=300; fi
 mkdir -p "$(dirname "$OUT")"
 
 in_display() { DISPLAY=:99 $DC exec -T amr bash -lc "export DISPLAY=:99; source /opt/ros/jazzy/setup.bash; source /work/install/setup.bash; cd /work; $1"; }

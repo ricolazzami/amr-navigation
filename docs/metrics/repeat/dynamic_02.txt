@@ -5,19 +5,19 @@
     3.98,
     3.98
   ],
-  "arrival_error_m": 0.161,
-  "time_to_goal_s": 82.0,
-  "travelled_m": 15.81,
+  "arrival_error_m": 0.142,
+  "time_to_goal_s": 87.5,
+  "travelled_m": 15.96,
   "astar_optimal_m": 16.5,
-  "path_ratio": 0.96,
-  "min_clearance_m": 0.09,
-  "max_decel_mps2": 2.08,
-  "rmse_raw_m": 0.082,
-  "rmse_ekf_m": 0.009,
-  "max_lateral_m": 0.22,
+  "path_ratio": 0.97,
+  "min_clearance_m": 0.08,
+  "max_decel_mps2": 2.42,
+  "rmse_raw_m": 0.031,
+  "rmse_ekf_m": 0.017,
+  "max_lateral_m": 0.19,
   "approach_episodes": 1,
   "max_ang_zero_cross": 0,
-  "samples": 920,
-  "duration_s": 91.9
+  "samples": 996,
+  "duration_s": 99.4
 }
-| dynamic_02 | yes | 82.0 | 15.81 / 16.5 (0.96) | 0.09 | 2.08 | 0.082 / 0.009 | 0.22 | 1/0 |
+| dynamic_02 | yes | 87.5 | 15.96 / 16.5 (0.97) | 0.08 | 2.42 | 0.031 / 0.017 | 0.19 | 1/0 |

@@ -14,7 +14,7 @@ N=${2:-10}
 GOAL_X=${3:-4.0}
 GOAL_Y=${4:-4.0}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-OUT="$ROOT/docs/metrics/repeat"
+OUT="${OUT:-$ROOT/docs/metrics/repeat}"
 RAW="$ROOT/log/repeat"
 DC="docker compose -f $ROOT/docker/compose.yaml"
 mkdir -p "$OUT"

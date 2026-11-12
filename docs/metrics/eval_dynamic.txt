@@ -1,23 +1,23 @@
 {
-  "run": "Dynamic obstacle",
+  "run": "dynamic_01",
   "success": true,
   "goal_snapped": [
     3.98,
     3.98
   ],
-  "arrival_error_m": 0.173,
-  "time_to_goal_s": 132.0,
-  "travelled_m": 16.11,
+  "arrival_error_m": 0.139,
+  "time_to_goal_s": 105.6,
+  "travelled_m": 16.3,
   "astar_optimal_m": 16.5,
-  "path_ratio": 0.98,
-  "min_clearance_m": 0.1,
-  "max_decel_mps2": 2.42,
-  "rmse_raw_m": 0.106,
-  "rmse_ekf_m": 0.03,
-  "max_lateral_m": 0.09,
+  "path_ratio": 0.99,
+  "min_clearance_m": 0.11,
+  "max_decel_mps2": 1.59,
+  "rmse_raw_m": 0.023,
+  "rmse_ekf_m": 0.021,
+  "max_lateral_m": 0.25,
   "approach_episodes": 0,
   "max_ang_zero_cross": null,
-  "samples": 2280,
-  "duration_s": 227.9
+  "samples": 1143,
+  "duration_s": 114.3
 }
-| Dynamic obstacle | yes | 132.0 | 16.11 / 16.5 (0.98) | 0.1 | 2.42 | 0.106 / 0.03 | 0.09 | 0/None |
+| dynamic_01 | yes | 105.6 | 16.3 / 16.5 (0.99) | 0.11 | 1.59 | 0.023 / 0.021 | 0.25 | 0/None |
