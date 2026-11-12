@@ -86,6 +86,11 @@ class ObstacleMover(Node):
         # not see and the run tested nothing. Same number as amr_control's
         # corridor_half_width, so "in the way" means the same to both nodes.
         self.declare_parameter("guard_lateral", 0.18)
+        # How long the box will yield before it gives up and sweeps on. Long
+        # enough for the reflex to hold its 1 s, mark the cell and replan
+        # (mark_period 1.5 s, recovery_after 2.5 s in amr_control), short enough
+        # that a frozen box cannot wall the robot in forever.
+        self.declare_parameter("hold_max_s", 6.0)
 
         gp = self.get_parameter
         self._world = gp("world_name").value
@@ -99,10 +104,14 @@ class ObstacleMover(Node):
         self._offset = float(gp("phase_offset").value)
         self._guard = float(gp("guard_radius").value)
         self._guard_lat = float(gp("guard_lateral").value)
+        self._hold_max = float(gp("hold_max_s").value)
         rate = float(gp("rate_hz").value)
 
         self._warned = False
-        self._held = False
+        # Where the box stopped and when; None when it is sweeping. While it is
+        # set, the box does not move (see _tick).
+        self._held_xy: tuple[float, float] = (0.0, 0.0)
+        self._held_at: float | None = None
         # Simulation time of the first plan; the sweep phase is measured from
         # here. None until then, so the box waits parked at y_min.
         self._t0: float | None = None
@@ -119,7 +128,7 @@ class ObstacleMover(Node):
             f"{self._lo:.1f}..{self._hi:.1f} every {self._period:.1f} s, "
             f"phase anchored to the first plan (+{self._offset:.1f} s), "
             f"yielding within {self._guard:.2f} m and {self._guard_lat:.2f} m "
-            f"off the lane"
+            f"off the lane for up to {self._hold_max:.0f} s"
         )
 
     def _now(self) -> float:
@@ -166,12 +175,25 @@ class ObstacleMover(Node):
         px = value if self._axis == "x" else self._x
         py = value if self._axis != "x" else 0.0
 
-        if self._robot_near(px, py):
-            if not self._held:
-                self.get_logger().info("robot close: obstacle holds position")
-                self._held = True
+        if self._held_at is not None:
+            # Keep it where it stopped: testing the *scheduled* position instead
+            # meant the box resumed as soon as the phase carried that scheduled
+            # point out of the corridor, so the hold lasted under a second and
+            # the reflex never reached its 1 s hold, never marked the cell and
+            # never replanned. A real obstacle that has stopped does not
+            # un-freeze on a timer.
+            if (
+                self._now() - self._held_at < self._hold_max
+                and self._robot_near(*self._held_xy)
+            ):
+                return
+            self._held_at = None
+            self.get_logger().info("obstacle resumes its sweep")
+        elif self._robot_near(px, py):
+            self._held_xy = (px, py)
+            self._held_at = self._now()
+            self.get_logger().info("robot close: obstacle holds position")
             return
-        self._held = False
 
         req = (
             f'name: "{self._model}", '

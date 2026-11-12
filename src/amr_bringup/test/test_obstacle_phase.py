@@ -18,6 +18,7 @@ LO, HI, PERIOD = -4.8, -3.4, 9.0
 OFFSET = 0.7
 GUARD_R = 0.75
 GUARD_LAT = 0.18        # == amr_control's corridor_half_width
+HOLD_MAX = 6.0          # s the box will yield before sweeping on
 LANE_Y = -4.33          # the y the A* route uses on the east leg
 ROBOT_Y = -4.20         # measured, on the east leg
 # Measured from the probe CSVs: the robot comes inside the 0.75 m guard radius at
@@ -127,7 +128,7 @@ def test_values_match_the_shipped_yaml():
     text = YAML.read_text()
     got = {}
     for key in ("y_min", "y_max", "period", "phase_offset",
-                "guard_radius", "guard_lateral"):
+                "guard_radius", "guard_lateral", "hold_max_s"):
         got[key] = float(re.search(rf"^\s*{key}:\s*([-\d.]+)", text, re.M).group(1))
     assert got == {
         "y_min": LO,
@@ -136,4 +137,5 @@ def test_values_match_the_shipped_yaml():
         "phase_offset": OFFSET,
         "guard_radius": GUARD_R,
         "guard_lateral": GUARD_LAT,
+        "hold_max_s": HOLD_MAX,
     }

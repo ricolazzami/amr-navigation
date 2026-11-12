@@ -28,6 +28,10 @@ obstacle_mover:
     # corridor_half_width, so both nodes agree on what "in the way" means.
     guard_radius: 0.75
     guard_lateral: 0.18
+    # How long the box yields before it sweeps on: long enough for the reflex's
+    # 1 s hold, mark and replan, short enough that a frozen box cannot wall the
+    # robot in forever.
+    hold_max_s: 6.0
     # Where in the 9 s sweep the box sits when the first plan arrives. The robot
     # crosses x = 0.5 at 22.0-22.2 sim s after the plan (measured) and comes
     # inside the 0.75 m guard radius at ~19.4 s; the box crosses the lane
