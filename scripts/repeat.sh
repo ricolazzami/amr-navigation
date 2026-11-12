@@ -22,13 +22,14 @@ mkdir -p "$OUT"
 # same way, or the log_run child cannot open its CSV.
 $DC exec -T amr mkdir -p /work/log/repeat >/dev/null 2>&1 || true
 
-if [ "$MODE" = dynamic ]; then DYN=true; LOG_S=240; else DYN=false; LOG_S=200; fi
+if [ "$MODE" = dynamic ]; then DYN=true; LOG_S=280; else DYN=false; LOG_S=200; fi
 
-# Simulation seconds to let AMCL settle before the goal is published. This is
-# deliberately measured on /clock, not with `sleep`: the mover is phase-locked
-# to the absolute simulation clock (obstacle_mover.py: t % period), so a
-# wall-clock wait made the encounter depend on how fast the host happened to
-# run the simulator, and the dynamic scenario was not reproducible.
+# Simulation seconds to let AMCL settle before the goal is published. The mover
+# no longer phase-locks to the absolute clock (it anchors to the first plan, see
+# obstacle_mover.py), so this no longer decides the encounter - but keeping the
+# goal at a fixed simulation time keeps the runs comparable, and a wall-clock
+# wait would not, because the host runs the simulator anywhere from RTF 0.3 to
+# 1.0.
 SETTLE_S=${SETTLE_S:-40}
 
 run_in() { $DC exec -T amr bash -lc "source /opt/ros/jazzy/setup.bash; source /work/install/setup.bash; cd /work; $1"; }
@@ -70,9 +71,10 @@ for i in $(seq 1 "$N"); do
     '{header: {frame_id: map}, pose: {position: {x: $GOAL_X, y: $GOAL_Y}, orientation: {w: 1.0}}}'" \
     >/dev/null 2>&1
 
-  # Wait for the goal, up to 300 s wall (the logger counts simulation seconds:
-  # static ~95 sim s, dynamic ~140 sim s, and the sim runs at RTF 0.3-0.65).
-  for _ in $(seq 1 60); do
+  # Wait for the goal, up to 480 s wall. The logger counts simulation seconds
+  # (static ~80, dynamic ~150-200 with the obstacle pinned) and the sim runs at
+  # RTF 0.3-0.65, so 200 sim s can be 600 s of wall time on a loaded host.
+  for _ in $(seq 1 96); do
     sleep 5
     if grep -q "Reached the goal" "$ROOT/log/repeat_$tag.log" 2>/dev/null; then break; fi
   done

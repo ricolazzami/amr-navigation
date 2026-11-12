@@ -22,6 +22,14 @@ matched *a* subscriber; with a second subscriber on the same topic it matched
 this node and not the A* planner on 2 of 3 runs, and the robot never moved. The
 ``/plan`` topic has one long-lived publisher (the A* node), so subscribing
 cannot take a match away from anybody.
+
+``phase_offset`` places the box in the lane at the moment the robot gets there.
+Measured: the robot crosses x = 0.5 at 22.0-22.2 sim s after the first plan
+(22.0-23.4 before, and arbitrary before that), and it comes inside the 0.75 m
+guard radius at ~19.4 s. 0.7 s puts the box 0.02 m off the lane at that instant
+(and within 0.14 m of it across a +/-0.3 s spread in the trigger), so the guard
+freezes the box squarely in the corridor and the reflex has something to hold,
+mark and replan around.
 """
 
 from __future__ import annotations
@@ -65,12 +73,19 @@ class ObstacleMover(Node):
         # sweep period. Tuned so the box reaches the robot's lane (y ~= -4.33,
         # crossed at 1.77 s and 7.23 s into the sweep) at the moment the robot
         # reaches x = 0.5, ~21-23 sim s after the goal.
-        self.declare_parameter("phase_offset", 7.0)
+        self.declare_parameter("phase_offset", 0.7)
         # The box is teleported, not simulated with a motor, so it would sweep
         # straight through a robot that has correctly stopped in front of it.
         # Hold position while the robot is this close: the obstacle yields, the
         # reflex still holds/marks/replans, and nothing physically overlaps.
         self.declare_parameter("guard_radius", 0.75)
+        # ...but only while the box is in the robot's way. With the radius alone
+        # the box froze wherever the *2-D* distance first dropped under it,
+        # which was the bottom of the sweep ~0.6 m off the lane and outside the
+        # reflex's 0.18 m corridor: the robot sailed past an obstacle it could
+        # not see and the run tested nothing. Same number as amr_control's
+        # corridor_half_width, so "in the way" means the same to both nodes.
+        self.declare_parameter("guard_lateral", 0.18)
 
         gp = self.get_parameter
         self._world = gp("world_name").value
@@ -83,6 +98,7 @@ class ObstacleMover(Node):
         self._period = max(0.1, float(gp("period").value))
         self._offset = float(gp("phase_offset").value)
         self._guard = float(gp("guard_radius").value)
+        self._guard_lat = float(gp("guard_lateral").value)
         rate = float(gp("rate_hz").value)
 
         self._warned = False
@@ -102,7 +118,8 @@ class ObstacleMover(Node):
             f"mover '{self._model}' sweeping {self._axis} "
             f"{self._lo:.1f}..{self._hi:.1f} every {self._period:.1f} s, "
             f"phase anchored to the first plan (+{self._offset:.1f} s), "
-            f"yielding within {self._guard:.2f} m of the robot"
+            f"yielding within {self._guard:.2f} m and {self._guard_lat:.2f} m "
+            f"off the lane"
         )
 
     def _now(self) -> float:
@@ -117,6 +134,12 @@ class ObstacleMover(Node):
             )
 
     def _robot_near(self, px: float, py: float) -> bool:
+        """True when the robot is close *and* the box is in its way.
+
+        The lateral gate is what the sweep axis is measured on: the box travels
+        across the robot's route, so its distance along that axis from the robot
+        is how far off the lane it is.
+        """
         try:
             tf = self._tf_buffer.lookup_transform(
                 "map", "base_link", rclpy.time.Time()
@@ -124,6 +147,9 @@ class ObstacleMover(Node):
         except Exception:
             return False
         t = tf.transform.translation
+        lateral = (t.y - py) if self._axis == "y" else (t.x - px)
+        if abs(lateral) > self._guard_lat:
+            return False
         return math.hypot(t.x - px, t.y - py) < self._guard
 
     def _tick(self) -> None:

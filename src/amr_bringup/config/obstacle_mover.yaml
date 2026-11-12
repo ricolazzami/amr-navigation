@@ -21,9 +21,18 @@ obstacle_mover:
     y_max: -3.4
     period: 9.0
     rate_hz: 5.0
+    # The box yields only when it is both close in 2-D and actually in the
+    # robot's corridor. With the radius alone it froze at the bottom of the
+    # sweep, 0.6 m off the lane and outside the 0.18 m corridor, so the robot
+    # sailed past an obstacle it could not see. Same 0.18 m as amr_control's
+    # corridor_half_width, so both nodes agree on what "in the way" means.
+    guard_radius: 0.75
+    guard_lateral: 0.18
     # Where in the 9 s sweep the box sits when the first plan arrives. The robot
-    # reaches x = 0.5 about 21-23 sim s after the plan, and the box crosses the
-    # lane at 1.77 s and 7.23 s into a sweep, so 7.0 puts a crossing at
-    # t - t_plan = 21.77 s: the box comes up into the lane just as the robot
-    # arrives. Measured, not guessed - see docs/metrics/README.md.
-    phase_offset: 7.0
+    # crosses x = 0.5 at 22.0-22.2 sim s after the plan (measured) and comes
+    # inside the 0.75 m guard radius at ~19.4 s; the box crosses the lane
+    # (y = -4.33, the y the A* route uses on the east leg) at 1.77 s and 7.23 s
+    # into a sweep, so 0.7 s puts it 0.02 m off the lane at 19.4 s and within
+    # 0.14 m of it across a +/-0.3 s spread. The freeze then lands squarely in
+    # the 0.18 m corridor. Measured, not guessed: docs/metrics/README.md
+    phase_offset: 0.7
