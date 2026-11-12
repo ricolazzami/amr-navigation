@@ -32,10 +32,25 @@ echo "== restart container"
 $DC restart amr >/dev/null 2>&1
 $DC exec -T amr mkdir -p /work/log >/dev/null 2>&1
 
+# A container restart kills any Xvfb but leaves its /tmp/.X99-lock behind, and
+# Xvfb then refuses to start on the stale lock -- no :99, so xdotool finds no
+# window and ffmpeg dies with "Cannot open display :99.0". Clear the lock, then
+# wait for the socket itself (it is bind-mounted to the host, which is what
+# ffmpeg grabs) instead of guessing with a fixed sleep.
+$DC exec -T amr bash -lc 'rm -f /tmp/.X99-lock /tmp/.X11-unix/X99' >/dev/null 2>&1
+
 echo "== isolated display :99 (1280x720), capture size $W x $H @ $FPS"
 $DC exec -T -d amr bash -lc \
   "exec Xvfb :99 -screen 0 ${W}x${H}x24 -nolisten tcp > /work/log/xvfb.log 2>&1"
-sleep 3
+for _ in $(seq 1 20); do
+  [ -e /tmp/.X11-unix/X99 ] && break
+  sleep 1
+done
+if [ ! -e /tmp/.X11-unix/X99 ]; then
+  echo "!! :99 never came up"
+  $DC exec -T amr cat /work/log/xvfb.log 2>/dev/null | tail -5
+  exit 1
+fi
 
 echo "== launch $MODE"
 DISPLAY=:99 $DC exec -T -d -e DISPLAY=:99 amr bash -lc \
