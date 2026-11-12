@@ -52,7 +52,15 @@ Visualization Manager:
     - Class: rviz_default_plugins/Map
       Enabled: true
       Name: Map
+      # map_server publishes the map once, TRANSIENT_LOCAL. RViz's default
+      # VOLATILE subscriber misses it whenever RViz comes up after that one
+      # publish, and the map layer silently never appears. Ask for the latched
+      # copy instead of racing the publisher.
       Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
         Value: /map
       Color Scheme: map
       Alpha: 0.7
@@ -61,6 +69,10 @@ Visualization Manager:
       Enabled: true
       Name: LocalCostmap
       Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
         Value: /local_costmap/costmap
       Color Scheme: costmap
       Alpha: 0.5
