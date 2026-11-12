@@ -21,9 +21,9 @@ obstacle_mover:
     y_max: -3.4
     period: 9.0
     rate_hz: 5.0
-    # Where in the 9 s sweep the box sits when the goal arrives. The robot
-    # reaches x = 0.5 about 21-23 sim s after the goal, and the box crosses the
+    # Where in the 9 s sweep the box sits when the first plan arrives. The robot
+    # reaches x = 0.5 about 21-23 sim s after the plan, and the box crosses the
     # lane at 1.77 s and 7.23 s into a sweep, so 7.0 puts a crossing at
-    # t - t_goal = 21.77 s: the box comes up into the lane just as the robot
+    # t - t_plan = 21.77 s: the box comes up into the lane just as the robot
     # arrives. Measured, not guessed - see docs/metrics/README.md.
     phase_offset: 7.0

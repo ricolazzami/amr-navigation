@@ -134,9 +134,17 @@ showed `max = 100, values {87, 96, 99, 100}`.
 
 ### 5.1 How each metric is defined
 
-Four definitions were tightened after the repeat runs, because a metric that
+Five definitions were tightened after the repeat runs, because a metric that
 silently changes meaning is worse than a missing one:
 
+- **Time is simulation time, not wall-clock time.** `scripts/log_run.py` runs
+  with `use_sim_time`, so its `t` column (and `time_to_goal_s`) is the Gazebo
+  clock. Before that fix the column was the system clock and the same robot
+  behaviour measured 20-30 % apart depending on host load — two GUI windows put
+  the simulator at RTF 0.28, headless at 0.64-0.67, and a 20 s logging request
+  took 56 s of wall time. The arrivals never changed, only the ruler. The earlier
+  wall-clock numbers are kept in `docs/metrics/repeat_wallclock/`; they are not
+  mixed with the simulation-time tables.
 - **Arrival point.** The requested goal `(4, 4)` sits inside the 0.22 m
   inflation band, so A* snaps it to `(3.98, 3.98)`; `(-1.7, 4.6)` snaps to
   `(-1.67, 4.58)`. Arrival and time-to-goal are measured against the snapped
@@ -170,24 +178,28 @@ Ten consecutive runs, no code change:
 
 | Run | Success | t (s) | Path / optimal | Clearance (m) | Decel (m/s2) | RMSE raw / EKF (m) | Lateral (m) |
 |---|---|---|---|---|---|---|---|
-| static_01 | yes | 82.4 | 15.87 / 16.5 | 0.11 | 0.90 | 0.008 / 0.009 | 0.12 |
-| static_02 | yes | 82.3 | 15.88 / 16.5 | 0.10 | 0.90 | 0.021 / 0.015 | 0.12 |
-| static_03 | yes | 79.9 | 15.80 / 16.5 | 0.12 | 0.90 | 0.023 / 0.014 | 0.12 |
-| static_04 | yes | 94.8 | 15.78 / 16.5 | 0.11 | 1.18 | 0.019 / 0.011 | 0.12 |
-| static_05 | yes | 85.5 | 15.86 / 16.5 | 0.10 | 0.90 | 0.018 / 0.030 | 0.11 |
-| static_06 | yes | 83.3 | 15.82 / 16.5 | 0.11 | 0.90 | 0.012 / 0.016 | 0.09 |
-| static_07 | yes | 82.3 | 15.79 / 16.5 | 0.13 | 0.91 | 0.031 / 0.067 | 0.11 |
-| static_08 | yes | 90.3 | 15.80 / 16.5 | 0.10 | 0.90 | 0.025 / 0.027 | 0.11 |
-| static_09 | yes | 92.2 | 15.79 / 16.5 | 0.13 | 0.91 | 0.029 / 0.018 | 0.10 |
-| static_10 | yes | 85.3 | 15.93 / 16.5 | 0.10 | 0.90 | 0.010 / 0.010 | 0.10 |
+| static_01 | yes | 82.1 | 15.85 / 16.5 | 0.10 | 0.90 | 0.031 / 0.021 | 0.10 |
+| static_02 | yes | 79.1 | 15.89 / 16.5 | 0.10 | 0.90 | 0.011 / 0.013 | 0.11 |
+| static_03 | yes | 77.9 | 15.78 / 16.5 | 0.11 | 0.90 | 0.038 / 0.022 | 0.11 |
+| static_04 | yes | 81.1 | 15.79 / 16.5 | 0.09 | 0.90 | 0.012 / 0.021 | 0.11 |
+| static_05 | yes | 81.1 | 15.93 / 16.5 | 0.10 | 0.90 | 0.016 / 0.033 | 0.09 |
+| static_06 | yes | 80.4 | 15.80 / 16.5 | 0.12 | 0.88 | 0.013 / 0.016 | 0.11 |
+| static_07 | yes | 81.5 | 15.77 / 16.5 | 0.09 | 0.90 | 0.049 / 0.051 | 0.11 |
+| static_08 | yes | 83.8 | 15.82 / 16.5 | 0.11 | 0.90 | 0.031 / 0.019 | 0.11 |
+| static_09 | yes | 81.7 | 15.79 / 16.5 | 0.10 | 0.90 | 0.028 / 0.007 | 0.12 |
+| static_10 | yes | 80.4 | 15.91 / 16.5 | 0.10 | 0.90 | 0.013 / 0.010 | 0.12 |
 
-Result: **10/10 reached the goal, 0 contacts (minimum clearance 0.10 m), 0 runs
+Result: **10/10 reached the goal, 0 contacts (minimum clearance 0.09 m), 0 runs
 above the 0.30 m lateral bound.** Acceptance threshold for the lateral criterion
 is one 5 cm cell (0.05 m) for a tracked controller error; the number reported
 here is the distance to the planned line, which also contains the plan's own
 0.05 m stair-stepping and the robot's 0.11 m corridor offset, so it is compared
 against 0.30 m and labelled as such rather than being claimed as a 1-cell
 tracking error.
+
+The ten times span 5.9 s (77.9-83.8 s). The same batch measured on wall-clock
+time spanned 14.9 s (79.9-94.8 s, `repeat_wallclock/`): the behaviour is the
+same, the ruler is not.
 
 ### 5.3 Repeat runs — dynamic obstacle, 10/10
 

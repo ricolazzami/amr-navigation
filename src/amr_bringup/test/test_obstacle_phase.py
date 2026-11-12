@@ -2,12 +2,13 @@
 
 These assert the property the dynamic test relies on: with the shipped
 ``obstacle_mover.yaml`` numbers, the box is in the robot's lane at the moment
-the robot arrives at x = 0.5 (measured at 21-23 sim s after the goal).
+the robot arrives at x = 0.5 (measured at 22.0-23.4 sim s after the plan).
 
 Runs on the container (``rclpy``); skipped on a bare host.
 """
 
 import math
+import pathlib
 
 import pytest
 
@@ -18,7 +19,7 @@ from amr_bringup.obstacle_mover import sweep_value  # noqa: E402
 LO, HI, PERIOD, OFFSET = -4.8, -3.4, 9.0, 7.0
 LANE_Y = -4.33          # the y the A* route uses on the east leg
 # Measured from the probe CSVs: the robot crosses x = 0.5 at 22.0-23.4 sim s
-# after the goal (two unpinned runs: +25.6 s and +27.0 s of log, goal published
+# after the plan (two unpinned runs: +25.6 s and +27.0 s of log, plan published
 # ~3.6 sim s into the log). The pinned run is the outlier, not the range.
 ARRIVAL_S = 22.5
 
@@ -40,10 +41,27 @@ def test_phase_is_anchored_not_clock_locked():
     )
 
 
-def test_box_is_parked_until_the_goal():
-    # offset 0 -> dt 0 is the bottom of the sweep, so a goal anchors a known
+def test_box_is_parked_until_the_first_plan():
+    # offset 0 -> dt 0 is the bottom of the sweep, so a plan anchors a known
     # phase rather than an arbitrary one.
     assert sweep_value(0.0, 0.0, PERIOD, LO, HI) == pytest.approx(LO)
+
+
+def test_anchor_topic_is_not_goal_pose():
+    """A second /goal_pose subscriber steals the match from the A* planner.
+
+    /goal_pose comes from a one-shot `ros2 topic pub --once`, which exits once
+    it has matched a subscriber. With this node also subscribed, 2 of 3
+    dynamic runs delivered the goal here and not to the planner, and the robot
+    never moved. Anchoring hangs off /plan instead.
+    """
+    src = pathlib.Path(
+        __import__("amr_bringup.obstacle_mover", fromlist=["x"]).__file__
+    ).read_text()
+    body = src.split('"""', 2)[2]      # skip the module docstring, which does
+    #                                    discuss /goal_pose and why not to use it
+    assert "PoseStamped" not in body          # no /goal_pose subscription
+    assert 'create_subscription(Path, "/plan"' in body
 
 
 def test_box_meets_the_robot_at_the_lane():
@@ -65,7 +83,6 @@ def test_sweep_stays_inside_the_configured_range():
 
 
 def test_offset_matches_the_shipped_yaml():
-    import pathlib
     import re
 
     cfg = pathlib.Path(__file__).parents[1] / "config" / "obstacle_mover.yaml"

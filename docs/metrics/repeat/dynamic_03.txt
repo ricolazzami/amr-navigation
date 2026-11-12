@@ -1,23 +1,23 @@
 {
   "run": "dynamic_03",
-  "success": true,
+  "success": false,
   "goal_snapped": [
     3.98,
     3.98
   ],
-  "arrival_error_m": 0.173,
-  "time_to_goal_s": 146.7,
-  "travelled_m": 16.66,
+  "arrival_error_m": 11.278,
+  "time_to_goal_s": NaN,
+  "travelled_m": 0.0,
   "astar_optimal_m": 16.5,
-  "path_ratio": 1.01,
-  "min_clearance_m": 0.11,
-  "max_decel_mps2": 2.4,
-  "rmse_raw_m": 0.263,
-  "rmse_ekf_m": 0.06,
-  "max_lateral_m": 0.23,
-  "approach_episodes": 13,
-  "max_ang_zero_cross": 0,
-  "samples": 1572,
-  "duration_s": 157.0
+  "path_ratio": 0.0,
+  "min_clearance_m": 0.82,
+  "max_decel_mps2": -0.0,
+  "rmse_raw_m": 0.0,
+  "rmse_ekf_m": 0.0,
+  "max_lateral_m": 0.02,
+  "approach_episodes": 0,
+  "max_ang_zero_cross": null,
+  "samples": 2400,
+  "duration_s": 239.9
 }
-| dynamic_03 | yes | 146.7 | 16.66 / 16.5 (1.01) | 0.11 | 2.4 | 0.263 / 0.06 | 0.23 | 13/0 |
+| dynamic_03 | NO | nan | 0.0 / 16.5 (0.0) | 0.82 | -0.0 | 0.0 / 0.0 | 0.02 | 0/None |

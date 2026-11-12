@@ -29,6 +29,25 @@ PYTHONPATH=src/amr_planning python3 scripts/eval_metrics.py \
 Definitions (snapped goal, 0.30 m arrival radius, median-filtered decel, lateral
 and oscillation) are in [`../report.md`](../report.md) §5.1.
 
+## Which clock the times are on
+
+`t` and `time_to_goal_s` are **simulation** seconds: `scripts/log_run.py` runs
+with `use_sim_time`, so the column is the Gazebo `/clock`, and the same robot
+behaviour measures the same on an idle host and a loaded one. That is not how
+it started. Until this was fixed, `log_run.py` never set `use_sim_time`, so `t`
+was Unix epoch and every duration was wall-clock. Measured on this host:
+
+| Configuration | Real-time factor |
+|---|---|
+| Gazebo GUI + RViz | 0.28 |
+| Gazebo GUI + RViz + CSV recorder | 0.28 |
+| Headless (`rviz:=false`, what the batches use) | 0.64-0.67 |
+
+So a run that was wall-clock 95 s could be 80 s of actual simulated motion, and
+the 20 s smoke test took 56 s of wall time at RTF 0.355. `repeat_wallclock/`
+holds the eval files measured under the old definition; `repeat/` holds the
+re-measured ones. They are kept apart rather than blended.
+
 ## Checkpoint A
 
 | File | What it proves |
